@@ -1,0 +1,27 @@
+Recipe: Scraping HDS + Intégration TMDB
+
+Objectif: |
+  Récupérer les URLs des vidéos depuis on4.hds.quest et enrichir les données avec les informations de l'API TMDB.
+
+Contexte:
+  - Site source: https://on4.hds.quest
+  - Type de données: Films, séries TV, documentaires
+  - Données à extraire: Titre, URL vidéo, année
+  - Source d'enrichissement: API TMDB (The Movie Database)
+
+Outils Requis:
+  - playwright pour le scraping des pages web
+  - axios ou node-fetch pour les appels API TMDB
+  - Variables d'environnement: TMDB_API_KEY
+
+prompt: |
+  Tu dois mettre en place le moissonnage du site https://on4.hds.quest
+  Les pages liées aux films sont dans lapage https://on4.hds.quest/films/
+  La liste des films est située dans la balise <div id="archive-content" class="animation-2 items">...</div>
+  Cette liste est classée par page avec une adresse formée comme cet exemple https://on4.hds.quest/films/page/2/. La page 1 n'existe pas c'est l'adresse de base https://on4.hds.quest/films/
+
+  Chaque vignette de la liste correspond à un film et l'on accède à la page du film en récupérant le lien contenu dans la balise <article id="post-76906" class="item movies">
+
+  Une fois que l'on est sur la page du film, il y a plusieurs boutons pour afficher un lecteur vidéo. Ces liens sont dans la balise <li id="player-option-1" class="dooplay_player_option" data-type="movie" data-post="76906" data-nume="1">
+  Une fois que l'on clique sur le lien, il faut attendre 20 secondes avant de voir apparaître le lecteur contenu dans une balise iframe ou video.
+  Il faudra analyser les trames réseau pour trouver le lien d'accès à la vidéo

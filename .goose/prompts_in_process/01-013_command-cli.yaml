@@ -1,0 +1,105 @@
+name: media-scraper-cli
+description: >
+  Récupération et indexation des films, séries TV et documentaires depuis
+  plusieurs sources (DidVIP, TMDB, etc.) avec filtres par genre, page,
+  nombre de résultats et type de média.
+
+prerequisites:
+  - node >= 18.0.0
+  - npm ou yarn
+  - Meilisearch configuré et accessible
+  - Clé API TMDB configurée dans .env
+  - Recipe Meilisearch initialisé
+
+steps:
+  - name: create-cli
+    description: Créer l'interface CLI avec Commander
+  - name: update-package-json
+    description: Ajouter les scripts CLI au package.json
+
+commands:
+  - nom: Scraping depuis DidVIP
+    description: Récupérer des films d'action depuis DidVIP et les indexer
+    commande: |
+      npm run media-scraper -s didvip -g action -p 1 -n 10 -t movie --index
+
+    parametres:
+      - -s --source         // Nom du site
+      - -g --genre          // genre des médias
+      - -p --page           // Numéro de page
+      - -n --number         // Nombre de médias sélectionnés
+      - -t --type           // type du média
+      - --index             // Indexer les médias
+
+options:
+  source:
+    description: Source de données pour le scraping
+    type: string
+    required: true
+    choices: ['didvip', 'tmdb']
+    default: 'tmdb'
+
+  genre:
+    description: Genre du média à récupérer
+    type: string
+    required: false
+    choices: ['action', 'adventure', 'animation', 'comedy', 'crime', 'documentary', 'drama', 'family', 'fantasy', 'horror', 'music', 'mystery', 'romance', 'science-fiction', 'thriller', 'war', 'western']
+    default: 'action'
+
+  page:
+    description: Numéro de page à récupérer (pour le paginage)
+    type: number
+    required: false
+    default: 1
+
+  number:
+    description: Nombre de médias à récupérer
+    type: number
+    required: false
+    default: 20
+
+  type:
+    description: Type de média à filtrer (uniquement pour TMDB)
+    type: string
+    required: false
+    choices: ['movie', 'documentary', 'series']
+
+  index:
+    description: Activer l'indexation dans Meilisearch
+    type: boolean
+    required: false
+    default: true
+
+notes:
+  - La clé API TMDB doit être configurée dans le fichier .env
+  - Meilisearch doit être initialisé avant d'utiliser l'option --index
+  - DidVIP nécessite Playwright pour le scraping (navigateur headless)
+  - TMDB a des limites de requêtes (environ 40 requêtes par 10 secondes)
+  - Les vidéos ne sont récupérées que si l'option --videos est activée
+  - L'indexation peut être désactivée avec --no-index pour un test sans base de données
+
+validation:
+  - name: Vérifier la configuration
+    description: Tester la connexion à TMDB et Meilisearch
+  - name: Test de scraping TMDB
+    description: Tester un scraping simple depuis TMDB
+  - name: Test d'indexation
+    description: Tester le scraping et l'indexation complets
+
+feature_branch: feature/media-scraper-cli-20260816
+
+troubleshooting:
+  - issue: "Erreur TMDB_API_KEY non configurée"
+    solution: "Vérifier que le fichier .env contient TMDB_API_KEY avec une valeur valide"
+
+  - issue: "Erreur de connexion Meilisearch"
+    solution: "Vérifier que Meilisearch est en cours d'exécution et que la clé maître est correcte"
+
+  - issue: "Erreur Playwright lors du scraping DidVIP"
+    solution: "Exécuter npx playwright install pour installer les dépendances navigateur"
+
+  - issue: "Aucun résultat trouvé"
+    solution: "Vérifier que le genre existe et essayer une autre page ou un autre genre"
+
+  - issue: "Erreur de parsing HTML DidVIP"
+    solution: "Le site DidVIP peut avoir changé sa structure."

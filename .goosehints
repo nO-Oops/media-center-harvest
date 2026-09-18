@@ -1,0 +1,101 @@
+# Project Hints: Outil de Moissonnage d'Information (Films, Séries, Documentaires)
+
+## Présentation du Projet
+Ce projet est un outil de moissonnage d'information (scraper/harvester) écrit en **Node.js**, conçu pour récupérer et normaliser des données sur des films, des séries TV et des documentaires à partir de plusieurs sites web. Ces données seront également alimentées par l'API de TMDB.
+
+## Stack Technique
+- **Runtime :** Node.js (version LTS)
+- **Langage :** TypeScript (fortement recommandé pour la typologie des données) ou JavaScript avec JSDoc.
+- **Bibliothèques de Scraping / Automatisation :**
+  - `playwright` : Bibliothèque principale pour les sites dynamiques, avec rendu JS complexe ou protections anti-bot (ex: Cloudflare, Datadome sur IMDb ou AlloCiné).
+- **Base de données de recherche / Indexation :**
+  - `meilisearch` : Client officiel Node.js pour Meilisearch (gestion des indexes, mise à jour des documents, configuration des settings).
+- **Gestion de la configuration :** `dotenv` pour les variables d'environnement (clés API, délais, paramètres Meilisearch).
+
+## Architecture et Structure des Modules
+Le projet doit suivre une architecture modulaire et découplée :
+- `src/models/` : Définition des interfaces/types du modèle de données normalisé (Media, Person, Episode).
+- `src/sources/` : Implémentations spécifiques des scrapeurs pour chaque site (ex: `imdbScraper.ts`, `allocineScraper.ts`, `tmdbApi.ts`).
+- `src/orchestrator/` : Ordonnanceur central qui gère le flux de travail, la concurrence, les retries et l'acheminement des requêtes vers la bonne source.
+- `src/database/meilisearch/` : Gestion du client Meilisearch, création des indexes, configuration des attributs (searchable, filterable, sortable) et gestion des opérations d'indexation (upsert, batch).
+- `src/utils/` : Fonctions utilitaires (délais aléatoires, logger, parseurs HTML, gestion des user-agents).
+
+## Modèle de Données & Indexes Meilisearch
+Toutes les données récupérées doivent être normalisées et indexées dans Meilisearch selon les 4 indexes suivants :
+
+```typescript
+interface MovieDocument {
+  id: string;                  // ID interne ou externe (ex: imdbId, tmdbId)
+  title: string;               // Titre principal
+  title_fr: string;            // Titre principal en français
+  overview: string;            // Synopsis
+  overview_fr: string;         // Synopsis en français
+  year: number;                // Date de sortie au format ISO 8601 ou null
+  genres: string[];            // Liste des Genres
+  cast: string[];              // Liste des acteurs
+  director: string;            // Réalisateur (pour les films/doc)
+  crew: string[];              // Liste des équipes
+  rating: number;              // Note
+  posterUrl: string[];         // Liste des URLs de l'affiche/poster
+  backdropUrls: string[];      // Liste des URLs des fonds d'écran
+  tmdb_id: number;             // Id du média sur TMDB
+  imdb_id: number;             // Id du média sur IMDB
+  spoken_languages: string[];  // Langue originale
+  runtime: number;             // Temps en minutes
+  video_links: string[];       // Lien des vidéos moissonnées
+}
+
+interface PersonDocument {
+  id: string;                  // ID de la personne
+  name: string;                // Nom complet
+  type: 'actor' | 'director' | 'creator' | 'writer' | 'other';
+  biography: string;           // Biographie courte ou lien vers la bio
+  profileUrl: string;          // URL du profil (ex: page IMDb/Wiki)
+  knownForMediaIds: string[];  // Liste des IDs des médias (films/séries) où la personne est connue
+}
+
+## Gestion des Erreurs et Replays (Retries) :
+Envelopper la logique de scraping dans des blocs try/catch.
+Implémenter une logique de retry avec backoff exponentiel en cas d'erreurs transitoires (ex: erreurs 429 Too Many Requests, 503 Service Unavailable). Limiter à un maximum de 3 tentatives.
+
+## Intégration et Indexation Meilisearch :
+Utiliser les opérations par lot (addDocuments ou updateDocuments avec des tableaux de documents) pour indexer les données de manière performante.
+Configurer les paramètres des indexes Meilisearch au démarrage de l'application ou via un script de migration :
+    movies :
+        searchableAttributes: ['title', 'title_fr', 'overview', 'overview_fr', 'genres']
+        filterableAttributes: ['type', 'genres', 'rating']
+        sortableAttributes: ['year', 'rating'].
+    persons :
+        searchableAttributes: ['name', 'biography']
+        filterableAttributes: ['type'].
+S'assurer que le champ id est toujours présent et unique pour chaque document, car Meilisearch l'utilise pour les mises à jour (upserts).
+
+## The scraper supports:
+- Validating video URLs (HLS .m3u8 or video formats: mp4, mkv, webm, avi, mov, flv, wmv, mpeg, mpg, m4v)
+- Extracting quality information (1080p, 720p, 480p, 360p, 4k, uhd, hd, sd, ld)
+- Extracting server identifiers (srv-x patterns)
+
+## Normes de Codage
+Utiliser async/await pour toutes les opérations asynchrones (scraping, appels Meilisearch).
+Utiliser des interfaces TypeScript pour les modèles de données et les documents Meilisearch afin d'assurer la cohérence des types.
+Utiliser un logger structuré ou standardisé (niveaux : info, warn, error, debug) pour le suivi du processus de moissonnage et d'indexation.
+Maintenir les scrapeurs découplés de l'orchestrateur et du client Meilisearch en utilisant des interfaces communes.
+
+## Configuration et Environnement
+Les clés API, les paramètres de scraping et les identifiants Meilisearch doivent être stockés dans un fichier .env à la racine du projet.
+
+Exemple de variables d'environnement attendues :
+'''
+# API Externes
+TMDB_API_KEY=votre_clé_api_tmdb_ici
+
+# Meilisearch Configuration
+MEILISEARCH_HOST=http://127.0.0.1:7700
+MEILISEARCH_MASTER_KEY=votre_master_key_meilisearch_ici
+
+# Scraping Configuration
+MAX_CONCURRENT_SCRAPERS=3
+REQUEST_DELAY_MIN=2000
+REQUEST_DELAY_MAX=5000
+LOG_LEVEL=info
+'''

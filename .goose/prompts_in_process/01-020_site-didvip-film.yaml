@@ -1,0 +1,37 @@
+Recipe: Scraping DidVIP + Intégration TMDB
+
+metadata:
+  feature_branch: feature/site-didvip-film-20260815
+  pr_url: https://github.com/nO-Oops/media-center-harvest/pull/3
+  status: in_progress
+
+Objectif: |
+  Récupérer les URLs des vidéos depuis didvip.com et enrichir les données avec les informations de l'API TMDB.
+
+Contexte:
+  - Site source: https://didvip.com
+  - Type de données: Films, séries TV, documentaires
+  - Données à extraire: Titre, URL vidéo, année
+  - Source d'enrichissement: API TMDB (The Movie Database)
+
+Outils Requis:
+  - playwright pour le scraping des pages web
+  - axios ou node-fetch pour les appels API TMDB
+  - Variables d'environnement: TMDB_API_KEY
+
+Contrainte:
+  - La couche de gestion de TMDB doit être séparée du reste.
+  - Le scraper de didvip ne doit reimplémenter la logique TMDB
+
+prompt: |
+  Tu dois mettre en place le moissonnage du site https://didvip.com
+  Les pages liées aux films sont dans le menu 'Genres'. Lorsque l'on clique sur un genre, exemple 'Action' une page s'ouvre avec une liste de films. L'avant derniere valeur de l'URL correspond à l'identifiant de la page et la dernière valeur de l'URL correspond au numéro de la page.
+  pour exemple l'adresse https://didvip.com/b6ig41m4d/c/didvip/10/5 à pour identifiant de page 10 (genre: policier) et nous affichons la page 6. La dernière valeur est 5 mais 0 représente la première page.
+
+  Chaque page de film est constituée d'un identifiant sans importance pour le moissonnage. Voici un exemple de page de film: https://didvip.com/b6ig41m4d/b/didvip/160436817
+  Information de missonnage sur la page de film:
+    - Le titre est dans la balise DIV avec une class 'film-detail-title' avec l'année entre parenthèses après le titre (exemple de la page: <div class="film-detail-title">Police Flash 80 (2026)</div>)
+    - La vidéo est dans la balise VIDEO avec la class 'jw-video' (exemple de la page: <video class="jw-video jw-reset" tabindex="-1" disableremoteplayback="" webkit-playsinline="" playsinline="" src="blob:https://vromov.com/73af9d1d-ea81-471b-b68e-bf2b00e05372"></video>)
+    - Tu dois utiliser le titre pour rechercher dans l'API de TMDB est ajouter les information manquantes
+
+    Il faudra analyser les trames réseau pour trouver le lien d'accès à la vidéo
