@@ -47,3 +47,5 @@ metadata:
     - "H4: Missing documentary type in Meilisearch settings (LOW)"
     - "H5: processedIds not persisted across restarts (LOW)"
     - "I1-I7: Suggested improvements for follow-up PRs"
+  step:
+    feature_generate: true
