@@ -1,24 +1,24 @@
 /**
  * Énumération des sources de données supportées par le moissonnage.
  */
-import { Media, Person } from './media';
+import { Media, Person } from "./media";
 
 export enum HarvestSource {
   /** API TMDB (The Movie Database). */
-  TMDB = 'tmdb',
+  TMDB = "tmdb",
   /** Scraping du site AlloCiné. */
-  ALLOCINE = 'allocine',
+  ALLOCINE = "allocine",
   /** Scraping du site FilmFr. */
-  FILMFR = 'filmfr',
+  FILMFR = "filmfr",
 }
 
 /**
  * Type d'un média moissonné.
  */
 export enum MediaKind {
-  MOVIE = 'movie',
-  SERIES = 'series',
-  DOCUMENTARY = 'documentary',
+  MOVIE = "movie",
+  SERIES = "series",
+  DOCUMENTARY = "documentary",
 }
 
 /**
@@ -46,10 +46,7 @@ export interface HarvestResult {
 /**
  * Construit un HarvestResult échoué avec une ou plusieurs erreurs.
  */
-export function failedHarvest(
-  source: HarvestSource,
-  errors: string[],
-): HarvestResult {
+export function failedHarvest(source: HarvestSource, errors: string[]): HarvestResult {
   return {
     source,
     success: false,
@@ -64,7 +61,7 @@ export function failedHarvest(
 export function successHarvest(
   source: HarvestSource,
   media?: Media,
-  person?: Person,
+  person?: Person
 ): HarvestResult {
   return {
     source,

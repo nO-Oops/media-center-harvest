@@ -1,4 +1,4 @@
-import { MediaKind } from './harvest';
+import { MediaKind } from "./harvest";
 
 /**
  * Document filmé dans l'index Meilisearch `movies`.
@@ -10,7 +10,7 @@ export interface MovieDocument {
   /** Identifiant unique du document. */
   id: string;
   /** Index cible de l'indexeur (discriminant de routage). */
-  indexName: 'movies';
+  indexName: "movies";
   /** Type de média (movie / series / documentary). */
   type: MediaKind;
   /** Titre principal. */
@@ -56,11 +56,11 @@ export interface PersonDocument {
   /** Identifiant unique du document. */
   id: string;
   /** Index cible de l'indexeur (discriminant de routage). */
-  indexName: 'persons';
+  indexName: "persons";
   /** Nom complet. */
   name: string;
   /** Rôle principal de la personne. */
-  type: 'actor' | 'director' | 'creator' | 'writer' | 'other';
+  type: "actor" | "director" | "creator" | "writer" | "other";
   /** Biographie courte. */
   biography: string;
   /** URL du profil. */
@@ -76,7 +76,7 @@ export interface ShowTvDocument {
   /** Identifiant unique du document. */
   id: string;
   /** Index cible de l'indexeur (discriminant de routage). */
-  indexName: 'showtv';
+  indexName: "showtv";
   /** Type de média (série). */
   type: MediaKind;
   /** Titre de la série. */
@@ -108,7 +108,7 @@ export interface EpisodeDocument {
   /** Identifiant unique du document. */
   id: string;
   /** Index cible de l'indexeur (discriminant de routage). */
-  indexName: 'episodes';
+  indexName: "episodes";
   /** Identifiant de la série parente. */
   showtv_id: string;
   /** Titre de l'épisode. */

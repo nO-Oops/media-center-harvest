@@ -1,14 +1,14 @@
-import type { MeiliSearch, Index } from 'meilisearch';
-import { retryWithBackoff } from '../../utils/retry';
-import { logger } from '../../utils/logger';
-import { ensureAllIndexes, INDEX_NAMES } from './indexes';
+import type { MeiliSearch, Index } from "meilisearch";
+import { retryWithBackoff } from "../../utils/retry";
+import { logger } from "../../utils/logger";
+import { ensureAllIndexes, INDEX_NAMES } from "./indexes";
 
 /** Types de documents acceptés par l'indexeur (union des modèles). */
 export type MeilisearchDocument =
-  | import('../../models/documents').MovieDocument
-  | import('../../models/documents').ShowTvDocument
-  | import('../../models/documents').EpisodeDocument
-  | import('../../models/documents').PersonDocument;
+  | import("../../models/documents").MovieDocument
+  | import("../../models/documents").ShowTvDocument
+  | import("../../models/documents").EpisodeDocument
+  | import("../../models/documents").PersonDocument;
 
 /**
  * Indexeur Meilisearch : création des indexes, configuration des paramètres
@@ -53,11 +53,11 @@ export class MeilisearchIndexer {
 
     const byIndex = new Map<string, MeilisearchDocument[]>();
     for (const doc of documents) {
-      if (!doc || typeof doc.id === 'undefined' || doc.id === '') {
-        errors.push('Document sans id unique ignoré');
+      if (!doc || typeof doc.id === "undefined" || doc.id === "") {
+        errors.push("Document sans id unique ignoré");
         continue;
       }
-      const indexName = (doc as { indexName?: string }).indexName ?? 'movies';
+      const indexName = (doc as { indexName?: string }).indexName ?? "movies";
       const bucket = byIndex.get(indexName) ?? [];
       bucket.push(doc);
       byIndex.set(indexName, bucket);

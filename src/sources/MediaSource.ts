@@ -1,5 +1,5 @@
-import { Media, Person, Episode } from '../models/media';
-import { HarvestSource } from '../models/harvest';
+import { Media, Person, Episode } from "../models/media";
+import { HarvestSource } from "../models/harvest";
 
 /**
  * Paramètres génériques de moissonnage transmis à une source.
@@ -16,7 +16,7 @@ export interface ScrapeParams {
   /** Nombre maximum de résultats à récupérer. */
   number?: number;
   /** Type de média ciblé. */
-  type?: 'movie' | 'documentary' | 'series';
+  type?: "movie" | "documentary" | "series";
 }
 
 /**

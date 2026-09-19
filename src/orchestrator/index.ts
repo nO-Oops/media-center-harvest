@@ -1,2 +1,2 @@
-export { Harvester, HarvesterOptions } from './harvester';
-export { indexResults, IndexResult } from './indexResults';
+export { Harvester, HarvesterOptions } from "./harvester";
+export { indexResults, IndexResult } from "./indexResults";

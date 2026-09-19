@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import "dotenv/config";
 
 /**
  * Configuration typée de l'application, chargée depuis les variables
@@ -24,7 +24,7 @@ export interface AppConfig {
 /** Parse un entier positif depuis une variable d'environnement. */
 function intEnv(name: string, fallback: number): number {
   const raw = process.env[name];
-  if (raw == null || raw.trim() === '') {
+  if (raw == null || raw.trim() === "") {
     return fallback;
   }
   const parsed = Number.parseInt(raw, 10);
@@ -37,13 +37,13 @@ function intEnv(name: string, fallback: number): number {
  */
 export function loadConfig(): AppConfig {
   return {
-    tmdbApiKey: process.env.TMDB_API_KEY ?? '',
-    meilisearchHost: process.env.MEILISEARCH_HOST ?? 'http://127.0.0.1:7700',
-    meilisearchMasterKey: process.env.MEILISEARCH_MASTER_KEY ?? '',
-    maxConcurrency: intEnv('MAX_CONCURRENT_SCRAPERS', 3),
-    requestDelayMin: intEnv('REQUEST_DELAY_MIN', 2000),
-    requestDelayMax: intEnv('REQUEST_DELAY_MAX', 5000),
-    logLevel: process.env.LOG_LEVEL ?? 'info',
+    tmdbApiKey: process.env.TMDB_API_KEY ?? "",
+    meilisearchHost: process.env.MEILISEARCH_HOST ?? "http://127.0.0.1:7700",
+    meilisearchMasterKey: process.env.MEILISEARCH_MASTER_KEY ?? "",
+    maxConcurrency: intEnv("MAX_CONCURRENT_SCRAPERS", 3),
+    requestDelayMin: intEnv("REQUEST_DELAY_MIN", 2000),
+    requestDelayMax: intEnv("REQUEST_DELAY_MAX", 5000),
+    logLevel: process.env.LOG_LEVEL ?? "info",
   };
 }
 

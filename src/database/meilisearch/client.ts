@@ -1,7 +1,7 @@
-import { MeiliSearch } from 'meilisearch';
-import type { Index } from 'meilisearch';
-import { AppConfig } from '../../utils/config';
-import { logger } from '../../utils/logger';
+import { MeiliSearch } from "meilisearch";
+import type { Index } from "meilisearch";
+import { AppConfig } from "../../utils/config";
+import { logger } from "../../utils/logger";
 
 /** Client Meilisearch découplé de la configuration. */
 export function createMeilisearchClient(config: AppConfig): MeiliSearch {
@@ -16,10 +16,10 @@ export function createMeilisearchClient(config: AppConfig): MeiliSearch {
 /** Retourne les indexes utilisés par l'indexeur. */
 export function createIndexes(client: MeiliSearch): Record<string, Index> {
   return {
-    movies: client.index('movies'),
-    showtv: client.index('showtv'),
-    episodes: client.index('episodes'),
-    persons: client.index('persons'),
+    movies: client.index("movies"),
+    showtv: client.index("showtv"),
+    episodes: client.index("episodes"),
+    persons: client.index("persons"),
   };
 }
 

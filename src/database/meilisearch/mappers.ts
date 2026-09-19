@@ -1,25 +1,25 @@
-import { Media, Person, Episode } from '../../models/media';
+import { Media, Person, Episode } from "../../models/media";
 import {
   MovieDocument,
   ShowTvDocument,
   EpisodeDocument,
   PersonDocument,
-} from '../../models/documents';
+} from "../../models/documents";
 
 /** Convertit un Media de type movie/documentary vers un MovieDocument. */
 export function mediaToMovieDocument(media: Media): MovieDocument {
   return {
     id: media.id,
-    indexName: 'movies',
+    indexName: "movies",
     type: media.kind,
     title: media.title,
-    title_fr: media.title_fr ?? '',
+    title_fr: media.title_fr ?? "",
     overview: media.overview,
-    overview_fr: media.overview_fr ?? '',
+    overview_fr: media.overview_fr ?? "",
     year: media.year ?? null,
     genres: media.genres,
     cast: media.cast,
-    director: media.director ?? '',
+    director: media.director ?? "",
     crew: media.crew,
     rating: media.rating,
     posterUrls: media.posterUrls,
@@ -36,7 +36,7 @@ export function mediaToMovieDocument(media: Media): MovieDocument {
 export function mediaToShowTvDocument(media: Media): ShowTvDocument {
   return {
     id: media.id,
-    indexName: 'showtv',
+    indexName: "showtv",
     type: media.kind,
     title: media.title,
     overview: media.overview,
@@ -44,7 +44,7 @@ export function mediaToShowTvDocument(media: Media): ShowTvDocument {
     air_date: media.year ? String(media.year) : null,
     vote_average: media.rating,
     vote_count: 0,
-    networks: (media.networks ?? []).join(', '),
+    networks: (media.networks ?? []).join(", "),
     season_number: media.numberOfSeasons ?? 0,
     tmdb_id: media.tmdbId ?? null,
     imdb_id: media.imdbId ?? null,
@@ -55,7 +55,7 @@ export function mediaToShowTvDocument(media: Media): ShowTvDocument {
 export function episodeToDocument(episode: Episode): EpisodeDocument {
   return {
     id: episode.id,
-    indexName: 'episodes',
+    indexName: "episodes",
     showtv_id: episode.showId,
     name: episode.name,
     overview: episode.overview,
@@ -72,7 +72,7 @@ export function episodeToDocument(episode: Episode): EpisodeDocument {
 export function personToDocument(person: Person): PersonDocument {
   return {
     id: person.id,
-    indexName: 'persons',
+    indexName: "persons",
     name: person.name,
     type: person.type,
     biography: person.biography,

@@ -112,7 +112,7 @@ export interface PersonResult {
 /** Élément de crédit d'un acteur (film ou série). */
 export interface ActorCreditItem {
   id: number;
-  media_type: 'movie' | 'tv';
+  media_type: "movie" | "tv";
   title: string;
   character?: string;
   release_date?: string;
@@ -127,7 +127,7 @@ export interface ActorCreditsResult {
 
 /** Distribution et équipe technique d'un média. */
 export interface CastAndCrewResult {
-  media_type: 'movie' | 'tv';
+  media_type: "movie" | "tv";
   title: string;
   cast: Array<{
     id: number;
@@ -147,7 +147,7 @@ export interface CastAndCrewResult {
 /** Élément de résultat de recherche. */
 export interface SearchItem {
   id: number;
-  media_type?: 'movie' | 'tv';
+  media_type?: "movie" | "tv";
   title: string;
   overview?: string;
   poster_path?: string | null;

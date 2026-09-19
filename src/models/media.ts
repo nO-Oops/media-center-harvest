@@ -1,4 +1,4 @@
-import { HarvestSource, MediaKind } from './harvest';
+import { HarvestSource, MediaKind } from "./harvest";
 
 /**
  * Un épisode d'une série TV.
@@ -33,7 +33,7 @@ export interface Person {
   /** Nom complet. */
   name: string;
   /** Rôle principal de la personne. */
-  type: 'actor' | 'director' | 'creator' | 'writer' | 'other';
+  type: "actor" | "director" | "creator" | "writer" | "other";
   /** Biographie courte. */
   biography: string;
   /** URL du profil (page source / wiki). */
@@ -113,10 +113,10 @@ type HarvestSourceLike = `${HarvestSource}` | string;
  */
 export function emptyMedia(kind: MediaKind): Media {
   return {
-    id: '',
+    id: "",
     kind,
-    title: '',
-    overview: '',
+    title: "",
+    overview: "",
     genres: [],
     cast: [],
     crew: [],
