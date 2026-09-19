@@ -2,6 +2,7 @@ import { MeilisearchIndexer } from "../../../src/database/meilisearch/indexer";
 import type { MeiliSearch, Index } from "meilisearch";
 import type { MovieDocument } from "../../../src/models/documents";
 import { MediaKind } from "../../../src/models/harvest";
+import { logger } from "../../../src/utils/logger";
 
 /** Construit un index Meilisearch factice (addDocuments / updateSettings mockés). */
 function fakeIndex(addDocuments: jest.Mock): Index {
@@ -121,5 +122,77 @@ describe("MeilisearchIndexer.upsert — comptage réel des documents indexés", 
 
     expect(res.errors).toEqual([]);
     expect(res.added).toBe(3);
+  });
+});
+
+describe("MeilisearchIndexer.ensureIndexes — configuration retryée des indexes", () => {
+  it("configure les quatre indexes via updateSettings", async () => {
+    const updateSettings = jest.fn().mockResolvedValue({ taskUid: 1 });
+    const client = {
+      index: (_uid: string) =>
+        ({ uid: _uid, addDocuments: jest.fn().mockResolvedValue({ taskUid: 2 }), updateSettings }) as unknown as Index,
+    } as unknown as MeiliSearch;
+    const indexer = new MeilisearchIndexer(client);
+
+    await indexer.ensureIndexes();
+
+    expect(updateSettings).toHaveBeenCalledTimes(4);
+    expect(updateSettings).toHaveBeenNthCalledWith(1, {
+      searchableAttributes: ["title", "title_fr", "overview", "overview_fr", "genres"],
+      filterableAttributes: ["type", "genres", "rating", "tmdb_id", "imdb_id"],
+      sortableAttributes: ["year", "rating"],
+    });
+  });
+
+  it("retente en cas d'erreur transitoire puis réussit", async () => {
+    let attempts = 0;
+    const updateSettings = jest.fn(async () => {
+      attempts++;
+      if (attempts < 2) {
+        // Erreur transitoire : le client Meilisearch expose un code statut numérique.
+        const err = new Error("Service Unavailable") as Error & { status?: number };
+        err.status = 503;
+        throw err;
+      }
+      return { taskUid: 3 };
+    });
+    const client = {
+      index: (_uid: string) =>
+        ({ uid: _uid, addDocuments: jest.fn().mockResolvedValue({ taskUid: 2 }), updateSettings }) as unknown as Index,
+    } as unknown as MeiliSearch;
+    const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
+    const indexer = new MeilisearchIndexer(client);
+
+    await expect(indexer.ensureIndexes()).resolves.toBeUndefined();
+
+    // Au moins une tentative a retenti (les 4 indexes × retries).
+    expect(updateSettings.mock.calls.length).toBeGreaterThan(4);
+    warn.mockRestore();
+  });
+
+  it("lance la dernière erreur si toutes les tentatives échouent", async () => {
+    const updateSettings = jest.fn(async () => {
+      const err = new Error("Service Unavailable") as Error & { status?: number };
+      err.status = 503;
+      throw err;
+    });
+    const client = {
+      index: (_uid: string) =>
+        ({ uid: _uid, addDocuments: jest.fn().mockResolvedValue({ taskUid: 2 }), updateSettings }) as unknown as Index,
+    } as unknown as MeiliSearch;
+    const indexer = new MeilisearchIndexer(client);
+
+    await expect(indexer.ensureIndexes()).rejects.toThrow();
+  });
+});
+
+describe("MeilisearchIndexer.getIndex", () => {
+  it("retourne l'index demandé et undefined pour un nom inconnu", async () => {
+    const { client } = fakeClient();
+    const indexer = new MeilisearchIndexer(client);
+
+    expect(indexer.getIndex("movies")).toBeDefined();
+    expect(indexer.getIndex("movies")?.uid).toBe("movies");
+    expect(indexer.getIndex("inconnue")).toBeUndefined();
   });
 });
