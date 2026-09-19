@@ -274,7 +274,9 @@ describe("getMovieById", () => {
     expect(result.imdb_id).toBe("tt0137523");
     expect(result.spoken_languages).toEqual(["en"]);
     expect(result.production_countries).toEqual(["United States"]);
-    expect(result.production_companies).toEqual([{ name: "Fox 2000", logo_path: "/l.png", origin_country: "US" }]);
+    expect(result.production_companies).toEqual([
+      { name: "Fox 2000", logo_path: "/l.png", origin_country: "US" },
+    ]);
     expect(result.backdrops).toEqual([{ file_path: "/bd.jpg", width: 1920, height: 800 }]);
     expect(result.posters[0].iso_639_1).toBe("en");
     expect(result.keywords).toEqual(["fratricide"]);
@@ -290,17 +292,15 @@ describe("getSeriesById", () => {
   it("mappe une ShowResult (title, air_date, overview, networks, season_number)", async () => {
     // Arrange
     const source = buildSource();
-    jest
-      .spyOn(source as any, "request")
-      .mockResolvedValue({
-        id: 1399,
-        name: "Game of Thrones",
-        air_date: "2011-04-17",
-        overview: "Winter is coming.",
-        networks: [{ name: "HBO" }],
-        poster_path: "/p.jpg",
-        season_number: 1,
-      } as any);
+    jest.spyOn(source as any, "request").mockResolvedValue({
+      id: 1399,
+      name: "Game of Thrones",
+      air_date: "2011-04-17",
+      overview: "Winter is coming.",
+      networks: [{ name: "HBO" }],
+      poster_path: "/p.jpg",
+      season_number: 1,
+    } as any);
     // Act
     const result = await source.getSeriesById(1399);
     // Assert
@@ -332,12 +332,15 @@ describe("getActorById", () => {
 });
 
 describe("searchMoviesByTitle", () => {
-  it("mappe les résultats comme media_type \"movie\"", async () => {
+  it('mappe les résultats comme media_type "movie"', async () => {
     // Arrange
     const source = buildSource();
-    jest
-      .spyOn(source as any, "request")
-      .mockResolvedValue({ results: [{ id: 550, title: "Fight Club" }, { id: 1, title: "Autre" }] } as any);
+    jest.spyOn(source as any, "request").mockResolvedValue({
+      results: [
+        { id: 550, title: "Fight Club" },
+        { id: 1, title: "Autre" },
+      ],
+    } as any);
     // Act
     const result = await source.searchMoviesByTitle("fight");
     // Assert
@@ -348,7 +351,7 @@ describe("searchMoviesByTitle", () => {
 });
 
 describe("searchSeriesByTitle", () => {
-  it("mappe les résultats comme media_type \"tv\"", async () => {
+  it('mappe les résultats comme media_type "tv"', async () => {
     // Arrange
     const source = buildSource();
     jest
@@ -367,9 +370,7 @@ describe("searchActorsByName (query filtrée)", () => {
   it("joint prénom et nom dans la query", async () => {
     // Arrange
     const source = buildSource();
-    const spy = jest
-      .spyOn(source as any, "request")
-      .mockResolvedValue({ results: [] } as any);
+    const spy = jest.spyOn(source as any, "request").mockResolvedValue({ results: [] } as any);
     // Act
     await source.searchActorsByName("Brad", "Pitt");
     // Assert
@@ -379,9 +380,7 @@ describe("searchActorsByName (query filtrée)", () => {
   it("filtre les parties vides (seulement nom)", async () => {
     // Arrange
     const source = buildSource();
-    const spy = jest
-      .spyOn(source as any, "request")
-      .mockResolvedValue({ results: [] } as any);
+    const spy = jest.spyOn(source as any, "request").mockResolvedValue({ results: [] } as any);
     // Act
     await source.searchActorsByName("  ", "Pitt");
     // Assert : la partie vide est filtrée, il ne reste que le nom
@@ -391,9 +390,7 @@ describe("searchActorsByName (query filtrée)", () => {
   it("query vide quand prénom et nom vides -> results vide", async () => {
     // Arrange
     const source = buildSource();
-    const spy = jest
-      .spyOn(source as any, "request")
-      .mockResolvedValue({ results: [] } as any);
+    const spy = jest.spyOn(source as any, "request").mockResolvedValue({ results: [] } as any);
     // Act
     await source.searchActorsByName("", "");
     // Assert : join de tableau vide -> ""
@@ -405,16 +402,20 @@ describe("getActorCredits", () => {
   it("mappe combined_credits.cast mixte (movies / shows)", async () => {
     // Arrange
     const source = buildSource();
-    jest
-      .spyOn(source as any, "request")
-      .mockResolvedValue({
-        combined_credits: {
-          cast: [
-            { id: 550, media_type: "movie", title: "Fight Club", character: "Narrator", vote_average: 8.4 },
-            { id: 1399, media_type: "tv", name: "Game of Thrones", vote_average: 9.0 },
-          ],
-        },
-      } as any);
+    jest.spyOn(source as any, "request").mockResolvedValue({
+      combined_credits: {
+        cast: [
+          {
+            id: 550,
+            media_type: "movie",
+            title: "Fight Club",
+            character: "Narrator",
+            vote_average: 8.4,
+          },
+          { id: 1399, media_type: "tv", name: "Game of Thrones", vote_average: 9.0 },
+        ],
+      },
+    } as any);
     // Act
     const result = await source.getActorCredits(287);
     // Assert
@@ -433,7 +434,7 @@ describe("getActorCredits", () => {
 });
 
 describe("getCastAndCrew (deux chemins)", () => {
-  it("chemin film : getMovie réussit -> mapCastAndCrew(..., \"movie\")", async () => {
+  it('chemin film : getMovie réussit -> mapCastAndCrew(..., "movie")', async () => {
     // Arrange
     const source = buildSource();
     jest.spyOn(source as any, "getMovie").mockResolvedValue({
@@ -448,16 +449,14 @@ describe("getCastAndCrew (deux chemins)", () => {
     expect(result.cast[0].name).toBe("Edward Norton");
   });
 
-  it("chemin série : getMovie rejette -> fallback getShow + mapCastAndCrew(..., \"tv\")", async () => {
+  it('chemin série : getMovie rejette -> fallback getShow + mapCastAndCrew(..., "tv")', async () => {
     // Arrange
     const source = buildSource();
     jest.spyOn(source as any, "getMovie").mockRejectedValue(new Error("404 Not Found"));
-    const showSpy = jest
-      .spyOn(source as any, "getShow")
-      .mockResolvedValue({
-        name: "Game of Thrones",
-        credits: { cast: [{ id: 2, name: "Kit Harington", order: 1 }], crew: [] },
-      } as any);
+    const showSpy = jest.spyOn(source as any, "getShow").mockResolvedValue({
+      name: "Game of Thrones",
+      credits: { cast: [{ id: 2, name: "Kit Harington", order: 1 }], crew: [] },
+    } as any);
     // Act
     const result = await source.getCastAndCrew(1399);
     // Assert
@@ -472,14 +471,26 @@ describe("getSeasonEpisodes", () => {
   it("mappe les épisodes en Episode[] avec id_showtv", async () => {
     // Arrange
     const source = buildSource();
-    jest
-      .spyOn(source as any, "request")
-      .mockResolvedValue({
-        episodes: [
-          { id: 1, episode_number: 1, name: "Ép 1", air_date: "2011-04-17", runtime: 58, vote_average: 8.0 },
-          { id: 2, episode_number: 2, name: "Ép 2", air_date: "2011-04-24", runtime: 57, vote_average: 8.1 },
-        ],
-      } as any);
+    jest.spyOn(source as any, "request").mockResolvedValue({
+      episodes: [
+        {
+          id: 1,
+          episode_number: 1,
+          name: "Ép 1",
+          air_date: "2011-04-17",
+          runtime: 58,
+          vote_average: 8.0,
+        },
+        {
+          id: 2,
+          episode_number: 2,
+          name: "Ép 2",
+          air_date: "2011-04-24",
+          runtime: 57,
+          vote_average: 8.1,
+        },
+      ],
+    } as any);
     // Act
     const result = await source.getSeasonEpisodes(1399, 1);
     // Assert
@@ -488,6 +499,16 @@ describe("getSeasonEpisodes", () => {
     expect(result[0].episode_number).toBe(1);
     expect(result[0].runtime).toBe(58);
     expect(result[1].episode_number).toBe(2);
+  });
+
+  it("retourne [] quand le champ episodes est absent ou non tableau", async () => {
+    // Arrange
+    const source = buildSource();
+    jest.spyOn(source as any, "request").mockResolvedValue({} as any);
+    // Act
+    const result = await source.getSeasonEpisodes(1399, 1);
+    // Assert
+    expect(result).toEqual([]);
   });
 });
 
@@ -545,6 +566,6 @@ describe("request retry (backoff)", () => {
     await expect((source as any).request("/movie/550", {})).resolves.toEqual({ id: 550 });
     // Assert : retry effectué + log de retry consigné
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect((global.fetch as jest.Mock)).toHaveBeenCalledTimes(2);
+    expect(global.fetch as jest.Mock).toHaveBeenCalledTimes(2);
   });
 });

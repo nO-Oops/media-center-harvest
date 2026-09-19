@@ -200,7 +200,12 @@ describe("mapMovieResult (données riches)", () => {
         { file_path: "/p_de.jpg", iso_639_1: "de", width: 1000, height: 1500 },
       ],
     };
-    const keywordsRes = { keywords: [{ id: 825, name: "fratricide" }, { id: 3414, name: "dualité" }] };
+    const keywordsRes = {
+      keywords: [
+        { id: 825, name: "fratricide" },
+        { id: 3414, name: "dualité" },
+      ],
+    };
 
     // Act
     const result = mapMovieResult(data as never, images as never, keywordsRes as never);
@@ -209,7 +214,7 @@ describe("mapMovieResult (données riches)", () => {
     expect(typeof result.id).toBe("string");
     expect(result.id.length).toBeGreaterThan(0);
     expect(result.title).toBe("Fight Club");
-    expect(result.overview).toBe("Un homme sinscrit dans le club de combat Fight Club.",)
+    expect(result.overview).toBe("Un homme sinscrit dans le club de combat Fight Club.");
     expect(result.genres).toEqual(["Drame"]);
     expect(result.release_date).toBe("1999-10-15");
     expect(result.revenue).toBe(170000000);
@@ -297,7 +302,12 @@ describe("mapMovieResult (données riches)", () => {
       videos: {
         results: [
           { site: "YouTube", key: "dQw4w9WgXcQ", iso_639_1: "en", type: "Trailer" },
-          { site: "Vimeo", key: "https://cdn.example.com/1080p/movie.mp4", iso_639_1: "en", type: "Clip" },
+          {
+            site: "Vimeo",
+            key: "https://cdn.example.com/1080p/movie.mp4",
+            iso_639_1: "en",
+            type: "Clip",
+          },
           { site: "Direct", key: "", iso_639_1: "en", type: "Clip" }, // key vide -> "" filtré
         ],
       },
@@ -350,7 +360,9 @@ describe("mapShowResult", () => {
 
   it("season_number : fallback number_of_seasons puis 0", () => {
     // Act & Assert
-    expect(mapShowResult({ id: 1, name: "X", number_of_seasons: 5 } as never).season_number).toBe(5);
+    expect(mapShowResult({ id: 1, name: "X", number_of_seasons: 5 } as never).season_number).toBe(
+      5
+    );
     expect(mapShowResult({ id: 1, name: "X" } as never).season_number).toBe(0);
   });
 });
@@ -372,8 +384,18 @@ describe("mapEpisodeResult", () => {
       videos: {
         results: [
           { site: "YouTube", key: "abc123", iso_639_1: "en", type: "Trailer" },
-          { site: "Direct", key: "https://srv-1.example.com/playlist.m3u8", iso_639_1: "en", type: "Clip" },
-          { site: "Direct", key: "https://cdn.example.com/movie.mp4", iso_639_1: "en", type: "Clip" },
+          {
+            site: "Direct",
+            key: "https://srv-1.example.com/playlist.m3u8",
+            iso_639_1: "en",
+            type: "Clip",
+          },
+          {
+            site: "Direct",
+            key: "https://cdn.example.com/movie.mp4",
+            iso_639_1: "en",
+            type: "Clip",
+          },
         ],
       },
     };
@@ -413,7 +435,7 @@ describe("mapEpisodeResult", () => {
 });
 
 describe("mapPersonResult (chemin gender)", () => {
-  it("gender nombre connu (1) -> \"Male\" via GENDER_LABEL", () => {
+  it('gender nombre connu (1) -> "Male" via GENDER_LABEL', () => {
     expect(mapPersonResult({ id: 287, name: "Brad Pitt", gender: 1 } as never).gender).toBe("Male");
   });
 
@@ -425,7 +447,7 @@ describe("mapPersonResult (chemin gender)", () => {
     expect(mapPersonResult({ id: 287, name: "X", gender: "Autre" } as never).gender).toBe("Autre");
   });
 
-  it("gender absent -> \"\"", () => {
+  it('gender absent -> ""', () => {
     expect(mapPersonResult({ id: 287, name: "X" } as never).gender).toBe("");
   });
 
@@ -452,8 +474,22 @@ describe("mapActorCredits (isolation films vs séries)", () => {
   const data = {
     combined_credits: {
       cast: [
-        { id: 550, media_type: "movie", title: "Fight Club", character: "The Narrator", release_date: "1999-10-15", vote_average: 8.4 },
-        { id: 1399, media_type: "tv", name: "Game of Thrones", character: undefined, air_date: "2011-04-17", vote_average: 9.0 },
+        {
+          id: 550,
+          media_type: "movie",
+          title: "Fight Club",
+          character: "The Narrator",
+          release_date: "1999-10-15",
+          vote_average: 8.4,
+        },
+        {
+          id: 1399,
+          media_type: "tv",
+          name: "Game of Thrones",
+          character: undefined,
+          air_date: "2011-04-17",
+          vote_average: 9.0,
+        },
         { id: 42, title: "Film sans media_type", release_date: "2020-01-01" }, // media_type absent -> default movie
       ],
     },
@@ -505,7 +541,13 @@ describe("mapCastAndCrew (tri order + champs optionnels)", () => {
       title: "Fight Club",
       credits: {
         cast: [
-          { id: 1, name: "Edward Norton", order: 1, character: "The Narrator", profile_path: "/en.jpg" },
+          {
+            id: 1,
+            name: "Edward Norton",
+            order: 1,
+            character: "The Narrator",
+            profile_path: "/en.jpg",
+          },
           { id: 2, name: "Brad Pitt", order: 0, character: "Jules", profile_path: "/bp.jpg" },
           { id: 3, name: "Anonyme", character: "Extra" }, // order absent -> 999, profile_path absent -> undefined
         ],
@@ -520,9 +562,27 @@ describe("mapCastAndCrew (tri order + champs optionnels)", () => {
     // Assert
     expect(result.media_type).toBe("movie");
     expect(result.title).toBe("Fight Club");
-    expect(result.cast[0]).toEqual({ id: 2, name: "Brad Pitt", character: "Jules", order: 0, profile_path: "/bp.jpg" });
-    expect(result.cast[1]).toEqual({ id: 1, name: "Edward Norton", character: "The Narrator", order: 1, profile_path: "/en.jpg" });
-    expect(result.cast[2]).toEqual({ id: 3, name: "Anonyme", character: "Extra", order: 999, profile_path: undefined });
+    expect(result.cast[0]).toEqual({
+      id: 2,
+      name: "Brad Pitt",
+      character: "Jules",
+      order: 0,
+      profile_path: "/bp.jpg",
+    });
+    expect(result.cast[1]).toEqual({
+      id: 1,
+      name: "Edward Norton",
+      character: "The Narrator",
+      order: 1,
+      profile_path: "/en.jpg",
+    });
+    expect(result.cast[2]).toEqual({
+      id: 3,
+      name: "Anonyme",
+      character: "Extra",
+      order: 999,
+      profile_path: undefined,
+    });
     expect(result.crew).toEqual([
       { id: 10, name: "David Fincher", job: "Director", profile_path: "/df.jpg" },
       { id: 11, name: "Jim Uhls", job: "Screenplay", profile_path: undefined },
@@ -571,7 +631,7 @@ describe("mapSearchItems", () => {
     expect(mapSearchItems("not-array", "movie")).toEqual([]);
   });
 
-  it("media_type \"person\" -> media_type undefined dans l'item", () => {
+  it('media_type "person" -> media_type undefined dans l\'item', () => {
     // Act
     const items = mapSearchItems([{ id: 287, name: "Brad Pitt" }], "person");
     // Assert
@@ -601,5 +661,58 @@ describe("extractVideoUrls (via mapTmdbMovie) — cas edge", () => {
     // Assert
     expect(media.spokenLanguages).toEqual(["fr"]);
     expect(media.videoLinks).toEqual(["https://srv-1.example.com/1080p/movie.mp4"]);
+  });
+});
+
+describe("mapTmdbShow — langues parlées (couverture branch map spokenLanguages)", () => {
+  it("extrait les iso_639_1 des langues parlées", () => {
+    const media = mapTmdbShow({
+      id: 99,
+      name: "Série avec langues",
+      first_air_date: "2020-01-01",
+      spoken_languages: [
+        { iso_639_1: "en", name: "English" },
+        { iso_639_1: "fr", name: "Français" },
+      ],
+    } as never);
+    expect(media.spokenLanguages).toEqual(["en", "fr"]);
+  });
+
+  it("retourne une liste vide sans langues parlées", () => {
+    const media = mapTmdbShow({ id: 100, name: "Sans langues", first_air_date: "2020-01-01" });
+    expect(media.spokenLanguages).toEqual([]);
+  });
+});
+
+describe("mapMovieResult — vidéos (couverture buildVideoLink clé vide)", () => {
+  it("ignore les vidéos à clé vide dans videos_link (buildVideoLink -> '')", () => {
+    const result = mapMovieResult(
+      {
+        id: 1,
+        title: "X",
+        release_date: "2020-01-01",
+        videos: {
+          results: [
+            { site: "Vimeo", key: "", iso_639_1: "en", type: "Clip" }, // clé vide -> ignorée
+            { site: "Vimeo", key: "https://cdn.example.com/film.m3u8", iso_639_1: "fr", type: "Clip" },
+          ],
+        },
+      } as never,
+      { backdrops: [], posters: [] } as never
+    );
+    expect(result.videos_link).toEqual(["https://cdn.example.com/film.m3u8"]);
+  });
+
+  it("retourne videos_link vide avec une seule vidéo à clé vide", () => {
+    const result = mapMovieResult(
+      {
+        id: 2,
+        title: "Y",
+        release_date: "2020-01-01",
+        videos: { results: [{ site: "YouTube", key: "", iso_639_1: "en" }] },
+      } as never,
+      { backdrops: [], posters: [] } as never
+    );
+    expect(result.videos_link).toEqual([]);
   });
 });

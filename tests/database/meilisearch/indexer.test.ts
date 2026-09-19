@@ -196,3 +196,40 @@ describe("MeilisearchIndexer.getIndex", () => {
     expect(indexer.getIndex("inconnue")).toBeUndefined();
   });
 });
+
+describe("MeilisearchIndexer.upsert — retry addDocuments (onRetry L.76)", () => {
+  it("retente l'indexation si addDocuments échoue une fois puis réussit", async () => {
+    // Arrange : addDocuments échoue une fois (transitoire) puis réussit -> onRetry appelé.
+    let attempts = 0;
+    const addDocuments = jest.fn(async (docs: unknown[]) => {
+      attempts++;
+      if (attempts < 2) {
+        const err = new Error("Service Unavailable") as Error & { status?: number };
+        err.status = 503;
+        throw err;
+      }
+      return { taskUid: 7 };
+    });
+    const client = {
+      index: (_uid: string) =>
+        ({
+          uid: _uid,
+          addDocuments,
+          updateSettings: jest.fn(async () => ({ taskUid: 1 })),
+        }) as unknown as Index,
+    } as unknown as MeiliSearch;
+    const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
+    const indexer = new MeilisearchIndexer(client);
+    const doc = { id: "1", indexName: "movies" } as MovieDocument;
+
+    // Act
+    const res = await indexer.upsert([doc]);
+
+    // Assert : retente puis indexe ; onRetry a journalisé.
+    expect(attempts).toBe(2);
+    expect(res.added).toBe(1);
+    expect(res.errors).toEqual([]);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
