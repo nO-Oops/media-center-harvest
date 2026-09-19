@@ -33,6 +33,16 @@ prompt: |
 
 metadata:
   feature_branch: "feature/media-harvester-20260813"
+  coverage_before:
+    statements: 75.42
+    branches: 76.1
+    functions: 71
+    lines: 75.43
+  coverage_after:
+    statements: 97.59
+    branches: 90.07
+    functions: 90
+    lines: 98.01
   status: "validated"
   review_date: "2026-08-14"
   review_recommendation: "APPROVE_WITH_COMMENTS"
@@ -47,3 +57,7 @@ metadata:
     - "H4: Missing documentary type in Meilisearch settings (LOW)"
     - "H5: processedIds not persisted across restarts (LOW)"
     - "I1-I7: Suggested improvements for follow-up PRs"
+  step:
+    feature_generate: true
+    review_analysis: true
+    review_fix: true
