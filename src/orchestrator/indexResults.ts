@@ -1,13 +1,13 @@
-import { HarvestResult } from '../sources/MediaSource';
-import { MeilisearchDocument } from '../database/meilisearch/indexer';
-import { MediaKind } from '../models/harvest';
+import { HarvestResult } from "../sources/MediaSource";
+import { MeilisearchDocument } from "../database/meilisearch/indexer";
+import { MediaKind } from "../models/harvest";
 import {
   mediaToMovieDocument,
   mediaToShowTvDocument,
   episodeToDocument,
   personToDocument,
-} from '../database/meilisearch/mappers';
-import { logger } from '../utils/logger';
+} from "../database/meilisearch/mappers";
+import { logger } from "../utils/logger";
 
 /** Contrat minimal d'un indexeur (découplé de l'implémentation Meilisearch). */
 export interface IndexerContract {
@@ -31,12 +31,12 @@ export interface IndexResult {
  */
 export async function indexResults(
   result: HarvestResult,
-  indexer: IndexerContract,
+  indexer: IndexerContract
 ): Promise<IndexResult> {
   const documents: MeilisearchDocument[] = [];
 
   for (const media of result.media) {
-    if (media.kind === 'series') {
+    if (media.kind === "series") {
       documents.push(mediaToShowTvDocument(media));
     } else {
       // movie / documentary -> index movies (H4 : type filterable)

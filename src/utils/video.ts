@@ -8,35 +8,15 @@
  */
 
 /** Formats vidéo reconnus (extension sans point, en minuscule). */
-const VIDEO_EXTENSIONS = [
-  'mp4',
-  'mkv',
-  'webm',
-  'avi',
-  'mov',
-  'flv',
-  'wmv',
-  'mpeg',
-  'mpg',
-  'm4v',
-];
+const VIDEO_EXTENSIONS = ["mp4", "mkv", "webm", "avi", "mov", "flv", "wmv", "mpeg", "mpg", "m4v"];
 
 /** Extension HLS (streaming adaptatif). */
-const HLS_EXTENSION = 'm3u8';
+const HLS_EXTENSION = "m3u8";
 
 /**
  * Qualité vidéo, classée de la plus basse à la plus haute résolution.
  */
-export type VideoQuality =
-  | '360p'
-  | '480p'
-  | '720p'
-  | '1080p'
-  | 'hd'
-  | 'sd'
-  | 'ld'
-  | '4k'
-  | 'uhd';
+export type VideoQuality = "360p" | "480p" | "720p" | "1080p" | "hd" | "sd" | "ld" | "4k" | "uhd";
 
 /** Résultat de l'analyse d'un lien vidéo. */
 export interface VideoInfo {
@@ -52,7 +32,7 @@ export interface VideoInfo {
 
 /** Retourne vrai si l'URL est un lien HLS ou un format vidéo reconnu. */
 export function isValidVideoUrl(url: string): boolean {
-  if (!url || typeof url !== 'string') {
+  if (!url || typeof url !== "string") {
     return false;
   }
   const normalized = url.trim().toLowerCase();
@@ -70,15 +50,15 @@ export function isValidVideoUrl(url: string): boolean {
 
 /** Ordre de priorité d'appariement (du plus précis vers le plus générique). */
 const QUALITY_PATTERNS: Array<{ regex: RegExp; quality: VideoQuality }> = [
-  { regex: /(?<![a-z0-9_])4k(?![a-z0-9_])/i, quality: '4k' },
-  { regex: /(?<![a-z0-9_])uhd(?![a-z0-9_])/i, quality: 'uhd' },
-  { regex: /(?<![a-z0-9_])1080p(?![a-z0-9_])/i, quality: '1080p' },
-  { regex: /(?<![a-z0-9_])720p(?![a-z0-9_])/i, quality: '720p' },
-  { regex: /(?<![a-z0-9_])480p(?![a-z0-9_])/i, quality: '480p' },
-  { regex: /(?<![a-z0-9_])360p(?![a-z0-9_])/i, quality: '360p' },
-  { regex: /(?<![a-z0-9_])hd(?![a-z0-9_])/i, quality: 'hd' },
-  { regex: /(?<![a-z0-9_])sd(?![a-z0-9_])/i, quality: 'sd' },
-  { regex: /(?<![a-z0-9_])ld(?![a-z0-9_])/i, quality: 'ld' },
+  { regex: /(?<![a-z0-9_])4k(?![a-z0-9_])/i, quality: "4k" },
+  { regex: /(?<![a-z0-9_])uhd(?![a-z0-9_])/i, quality: "uhd" },
+  { regex: /(?<![a-z0-9_])1080p(?![a-z0-9_])/i, quality: "1080p" },
+  { regex: /(?<![a-z0-9_])720p(?![a-z0-9_])/i, quality: "720p" },
+  { regex: /(?<![a-z0-9_])480p(?![a-z0-9_])/i, quality: "480p" },
+  { regex: /(?<![a-z0-9_])360p(?![a-z0-9_])/i, quality: "360p" },
+  { regex: /(?<![a-z0-9_])hd(?![a-z0-9_])/i, quality: "hd" },
+  { regex: /(?<![a-z0-9_])sd(?![a-z0-9_])/i, quality: "sd" },
+  { regex: /(?<![a-z0-9_])ld(?![a-z0-9_])/i, quality: "ld" },
 ];
 
 /**
@@ -86,7 +66,7 @@ const QUALITY_PATTERNS: Array<{ regex: RegExp; quality: VideoQuality }> = [
  * Retourne `null` si aucune qualité reconnue n'est présente.
  */
 export function extractQuality(input: string): VideoQuality | null {
-  if (!input || typeof input !== 'string') {
+  if (!input || typeof input !== "string") {
     return null;
   }
   for (const { regex, quality } of QUALITY_PATTERNS) {
@@ -102,7 +82,7 @@ export function extractQuality(input: string): VideoQuality | null {
  * Retourne `null` si aucun identifiant n'est présent.
  */
 export function extractServerId(input: string): string | null {
-  if (!input || typeof input !== 'string') {
+  if (!input || typeof input !== "string") {
     return null;
   }
   const match = input.match(/srv-(\d+)/i);
@@ -114,7 +94,7 @@ export function extractServerId(input: string): string | null {
  */
 export function analyzeVideo(url: string): VideoInfo {
   const info: VideoInfo = { url, valid: false };
-  if (!url || typeof url !== 'string') {
+  if (!url || typeof url !== "string") {
     return info;
   }
   const trimmed = url.trim();
@@ -135,7 +115,7 @@ export function normalizeVideoUrls(urls: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const raw of urls) {
-    if (!raw || typeof raw !== 'string') {
+    if (!raw || typeof raw !== "string") {
       continue;
     }
     const trimmed = raw.trim();

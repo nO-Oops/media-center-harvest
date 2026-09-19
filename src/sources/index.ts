@@ -1,7 +1,7 @@
-import { MediaSource } from './MediaSource';
-import { HarvestSource } from '../models/harvest';
-import { AppConfig } from '../utils/config';
-import { TmdbSource } from './tmdb/tmdbSource';
+import { MediaSource } from "./MediaSource";
+import { HarvestSource } from "../models/harvest";
+import { AppConfig } from "../utils/config";
+import { TmdbSource } from "./tmdb/tmdbSource";
 
 /** Registry des sources disponibles, dispatché par la CLI. */
 export class SourceRegistry {
@@ -42,5 +42,5 @@ export function createRegistry(config: AppConfig): SourceRegistry {
 export { TmdbSource, HarvestSource };
 
 /** Ré-expose l'interface commune des sources pour les appelants/tests. */
-export type { MediaSource, HarvestResult, ScrapeParams } from './MediaSource';
-export { emptyResult, appendError } from './MediaSource';
+export type { MediaSource, HarvestResult, ScrapeParams } from "./MediaSource";
+export { emptyResult, appendError } from "./MediaSource";

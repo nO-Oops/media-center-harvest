@@ -1,10 +1,10 @@
-import { readFileSync, writeFileSync } from 'fs';
-import { MediaSource, HarvestResult, emptyResult, appendError } from '../sources/MediaSource';
-import { ScrapeParams } from '../sources/MediaSource';
-import { SourceRegistry } from '../sources';
-import { RateLimiter } from '../utils/delay';
-import { retryWithBackoff } from '../utils/retry';
-import { logger } from '../utils/logger';
+import { readFileSync, writeFileSync } from "fs";
+import { HarvestResult, emptyResult, appendError } from "../sources/MediaSource";
+import { ScrapeParams } from "../sources/MediaSource";
+import { SourceRegistry } from "../sources";
+import { RateLimiter } from "../utils/delay";
+import { retryWithBackoff } from "../utils/retry";
+import { logger } from "../utils/logger";
 
 /** Options de configuration de l'orchestrateur. */
 export interface HarvesterOptions {
@@ -44,7 +44,7 @@ export class Harvester {
       return;
     }
     try {
-      const raw = readFileSync(this.processedIdsFile, 'utf-8');
+      const raw = readFileSync(this.processedIdsFile, "utf-8");
       const ids = JSON.parse(raw) as string[];
       if (Array.isArray(ids)) {
         for (const id of ids) {
@@ -62,7 +62,7 @@ export class Harvester {
       return;
     }
     try {
-      writeFileSync(this.processedIdsFile, JSON.stringify(Array.from(this.processedIds)), 'utf-8');
+      writeFileSync(this.processedIdsFile, JSON.stringify(Array.from(this.processedIds)), "utf-8");
     } catch (error) {
       logger.warn(`Échec de persistance des ids traités : ${(error as Error).message}`);
     }
@@ -104,7 +104,7 @@ export class Harvester {
           maxRetries: 3,
           onRetry: ({ attempt, delay }) =>
             logger.warn(`Source ${sourceName} - tentative ${attempt} dans ${delay}ms`),
-        },
+        }
       );
       // Déduplication par id interne.
       for (const media of harvested.media) {

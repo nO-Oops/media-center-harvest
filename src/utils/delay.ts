@@ -20,9 +20,7 @@ export function delay(ms: number): Promise<void> {
  */
 export function randomDelay(min: number, max: number): Promise<number> {
   if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < min) {
-    return Promise.reject(
-      new Error(`Fourchette de délai invalide: [${min}, ${max}]`),
-    );
+    return Promise.reject(new Error(`Fourchette de délai invalide: [${min}, ${max}]`));
   }
   const duration = Math.floor(Math.random() * (max - min + 1)) + min;
   return delay(duration).then(() => duration);
@@ -41,16 +39,12 @@ export class RateLimiter {
   private readonly minSpacing: number;
   private lastRunAt = 0;
 
-  constructor(options?: {
-    minDelay?: number;
-    maxDelay?: number;
-    minSpacing?: number;
-  }) {
+  constructor(options?: { minDelay?: number; maxDelay?: number; minSpacing?: number }) {
     this.minDelay = options?.minDelay ?? 2000;
     this.maxDelay = options?.maxDelay ?? 5000;
     this.minSpacing = options?.minSpacing ?? 0;
     if (this.maxDelay < this.minDelay) {
-      throw new Error('maxDelay doit être >= minDelay');
+      throw new Error("maxDelay doit être >= minDelay");
     }
   }
 

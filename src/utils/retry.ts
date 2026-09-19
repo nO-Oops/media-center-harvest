@@ -38,15 +38,15 @@ const TRANSIENT_HTTP_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
 /** Sous-chaînes de message d'erreur réseau considérées comme transitoires. */
 const TRANSIENT_ERROR_MARKERS = [
-  'ECONNRESET',
-  'EIMEDOUT',
-  'ENOTFOUND',
-  'EAI_AGAIN',
-  'ETIMEDOUT',
-  'ECONNREFUSED',
-  'timeout',
-  'timed out',
-  'network',
+  "ECONNRESET",
+  "EIMEDOUT",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ETIMEDOUT",
+  "ECONNREFUSED",
+  "timeout",
+  "timed out",
+  "network",
 ];
 
 /**
@@ -68,15 +68,15 @@ export function isTransientError(error: unknown): boolean {
 }
 
 function extractStatus(error: unknown): number | null {
-  if (error && typeof error === 'object') {
+  if (error && typeof error === "object") {
     const candidate = (error as Record<string, unknown>).status;
-    if (typeof candidate === 'number') {
+    if (typeof candidate === "number") {
       return candidate;
     }
     const response = (error as Record<string, unknown>).response;
-    if (response && typeof response === 'object') {
+    if (response && typeof response === "object") {
       const status = (response as Record<string, unknown>).status;
-      if (typeof status === 'number') {
+      if (typeof status === "number") {
         return status;
       }
     }
@@ -93,7 +93,7 @@ function extractStatus(error: unknown): number | null {
  */
 export async function retryWithBackoff<T>(
   fn: (attempt: number) => Promise<T>,
-  options?: RetryOptions,
+  options?: RetryOptions
 ): Promise<T> {
   const maxRetries = options?.maxRetries ?? 3;
   const baseDelay = options?.baseDelay ?? 500;
@@ -122,9 +122,10 @@ export async function retryWithBackoff<T>(
           attempts: attempt,
           code: extractStatus(error) ?? undefined,
         };
-        const wrapped = error instanceof Error
-          ? error
-          : new Error(`Échec après ${attempt} tentative(s): ${String(error)}`);
+        const wrapped =
+          error instanceof Error
+            ? error
+            : new Error(`Échec après ${attempt} tentative(s): ${String(error)}`);
         (wrapped as unknown as Record<string, unknown>).cause = failure;
         throw wrapped;
       }

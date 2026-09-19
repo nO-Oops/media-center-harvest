@@ -13,7 +13,7 @@ export enum LogLevel {
 }
 
 /** Niveau de log sous forme de chaîne (utilisé dans le fichier .env). */
-export type LogLevelName = 'debug' | 'info' | 'warn' | 'error' | 'silent';
+export type LogLevelName = "debug" | "info" | "warn" | "error" | "silent";
 
 /** Entrée de log produite par le logger. */
 export interface LogEntry {
@@ -45,8 +45,7 @@ export class Logger {
   private readonly sink: LogSink;
 
   constructor(options?: { level?: LogLevelName; sink?: LogSink }) {
-    this.currentLevel =
-      options?.level ? LEVEL_BY_NAME[options.level] : LogLevel.INFO;
+    this.currentLevel = options?.level ? LEVEL_BY_NAME[options.level] : LogLevel.INFO;
     this.sink = options?.sink ?? defaultSink;
   }
 
@@ -57,33 +56,30 @@ export class Logger {
 
   /** Retourne le niveau actuel. */
   getLevel(): LogLevelName {
-    return (Object.keys(LEVEL_BY_NAME) as LogLevelName[]).find(
-      (key) => LEVEL_BY_NAME[key] === this.currentLevel,
-    ) ?? 'info';
+    return (
+      (Object.keys(LEVEL_BY_NAME) as LogLevelName[]).find(
+        (key) => LEVEL_BY_NAME[key] === this.currentLevel
+      ) ?? "info"
+    );
   }
 
   debug(message: string, meta?: unknown): void {
-    this.log(LogLevel.DEBUG, 'debug', message, meta);
+    this.log(LogLevel.DEBUG, "debug", message, meta);
   }
 
   info(message: string, meta?: unknown): void {
-    this.log(LogLevel.INFO, 'info', message, meta);
+    this.log(LogLevel.INFO, "info", message, meta);
   }
 
   warn(message: string, meta?: unknown): void {
-    this.log(LogLevel.WARN, 'warn', message, meta);
+    this.log(LogLevel.WARN, "warn", message, meta);
   }
 
   error(message: string, meta?: unknown): void {
-    this.log(LogLevel.ERROR, 'error', message, meta);
+    this.log(LogLevel.ERROR, "error", message, meta);
   }
 
-  private log(
-    level: LogLevel,
-    name: LogLevelName,
-    message: string,
-    meta?: unknown,
-  ): void {
+  private log(level: LogLevel, name: LogLevelName, message: string, meta?: unknown): void {
     if (level < this.currentLevel) {
       return;
     }
@@ -92,19 +88,19 @@ export class Logger {
 
   /** Construit un logger depuis la variable d'environnement LOG_LEVEL. */
   static fromEnv(sink?: LogSink): Logger {
-    const raw = (process.env.LOG_LEVEL ?? 'info').toLowerCase();
-    return new Logger({ level: (raw as LogLevelName), sink });
+    const raw = (process.env.LOG_LEVEL ?? "info").toLowerCase();
+    return new Logger({ level: raw as LogLevelName, sink });
   }
 }
 
 function defaultSink(entry: LogEntry): void {
   const line = `[${entry.timestamp}] ${entry.level.toUpperCase()}: ${entry.message}`;
-  if (entry.level === 'error' || entry.level === 'warn') {
+  if (entry.level === "error" || entry.level === "warn") {
     // eslint-disable-next-line no-console
-    console.error(line, entry.meta ?? '');
+    console.error(line, entry.meta ?? "");
   } else {
     // eslint-disable-next-line no-console
-    console.log(line, entry.meta ?? '');
+    console.log(line, entry.meta ?? "");
   }
 }
 
