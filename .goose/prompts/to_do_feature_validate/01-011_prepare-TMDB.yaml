@@ -1,0 +1,91 @@
+version : 1.0.0
+titre : Créer une API TMDB en Node.js.
+
+Rôle : Développeur backend Node.js
+Description : |
+  Cette API sera utilisée exclusivement par une application backend ; il n'y aura pas d'accès direct pour les utilisateurs.
+  Vous devez vérifier qu’elle fonctionne
+Variables :
+  - TMDB_API_KEY : lisez le contenu de la variable à l’aide de la commande
+  - TMDB_BASE_URL : https://api.themoviedb.org/3
+Contraintes :
+  - Pas de documentation, de fichier README, d’exemples ni de tests
+  - Code propre et facile à maintenir
+
+Fonctionnalités requises :
+  - Films :
+      - get_movie_by_id(tmdb_id)
+      - search_movies_by_title(title)
+  - Séries TV :
+      - get_series_by_id(tmdb_id)
+      - search_series_by_title(title)
+  - Acteurs :
+      - get_actor_by_id(tmdb_id)
+      - search_actors_by_name(firstname, name)
+      - get_actor_credits(tmdb_id) - renvoie les films et séries
+  - Général :
+      - get_cast_and_crew(tmdb_id) - distribution complète
+
+Informations retournées :
+  - movies :
+      - id (string)                     identifiant uuid v4
+      - title (string)
+      - overview (string)               Symopsis
+      - genres (string[])               Liste des genres
+      - release_date (date)             Date de sortie
+      - revenue (number)
+      - runtime (number)                Temps de la vidéo
+      - tagline (string)
+      - vote_average (number)           Moyenne des votes
+      - vote_count (number)             Nombre de votes
+      - spoken_languages (string)       Langage de la vidéo
+      - production_countries (string)   Pays d'origine
+      - production_companies (string[]) Name, logo, pays
+      - imdb_id (string)                identifiant imdb
+      - budget (number)
+      - backdrops (string[dict])        Liste des 3 backdrops avec une largeur >= 1920
+      - posters (string[dict])          Récupération de 2 posters avec iso_639_1 'en' et 'fr'
+      - videos (string[dict])           Récupération de 2 videos avec iso_639_1 'en' et 'fr'
+      - keywords (string[])             Liste de mots clés
+      - videos_link (string[])          Liste des urls de videos
+  - showtv :
+      - id (string)                     identifiant uuid v4
+      - title (string)                  Titre de la série
+      - air_date (date)                 Date de diffusion
+      - overview (string)               Synopsis
+      - networks (string)               Producteurs
+      - poster_path (string)            Image
+      - season_number (number)          Numéro de la saison
+  - episodes :
+      - id (string)                     identifiant uuid v4
+      - id_showtv                       identifiant de la série
+      - air_date (date)                 date de diffusion
+      - episode_number (number)         numéro de l'épisode
+      - name (string)                   titre de l'épisode
+      - overview (string)               sysnopsis
+      - runtime (number)                Durée de l'épisode
+      - vote_average (number)           Moyenne des votes
+      - vote_count (number)             Nombre de votes
+      - images (string)                 Récupération d'une image (file_path)
+      - videos_link (string[])          Liste des urls de videos
+  - persons :
+      - id (string)                     identifiant uuid v4
+      - name (string)                   Nom de la personne
+      - gender (string)                 genre de la personne
+      - place_of_birth (string)         lieu de naissance
+      - profile_path (string)           image du portrait
+      - birthday (date)                 date de naissance
+      - deathday (date)                 date de mort
+      - biography (string)              biographie
+
+Exigences techniques :
+  - Gérer les erreurs et les délais d'expiration
+  - Renvoyer des données structurées (dictionnaire)
+  - Pas de tests unitaires pour l'instant
+  - Cache de base pour éviter les appels répétés
+  - Récupérer des détails enrichis (distribution, équipe technique, images, bande-annonce)
+
+metadata:
+  feature_branch: feature/create-tmdb-api-20260814
+  step:
+    feature_generate: true
