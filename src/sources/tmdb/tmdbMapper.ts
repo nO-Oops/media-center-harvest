@@ -224,6 +224,27 @@ function mapVideos(videos: { results?: Array<Record<string, unknown>> } | undefi
   }));
 }
 
+/**
+ * Construit le lien de visionnement d'une vidéo TMDB selon sa source.
+ *
+ * - `YouTube` -> URL de visionnement `https://www.youtube.com/watch?v=<key>`
+ * - toute autre source -> conserve la clé / URL brute (flux direct `.mp4`/`.m3u8`,
+ *   Vimeo, Dailymotion…), sans l'emballer dans un template YouTube.
+ *
+ * Évite la corruption observée où une clé non-YouTube était injectée dans un
+ * template d'URL YouTube (`youtube.com/watch?v=https://cdn…/movie.mp4`).
+ */
+function buildVideoLink(item: { key?: unknown; site?: unknown }): string {
+  const cleanKey = String(item.key ?? '').trim();
+  if (!cleanKey) {
+    return '';
+  }
+  if (String(item.site ?? '').toLowerCase() === 'youtube') {
+    return `https://www.youtube.com/watch?v=${cleanKey}`;
+  }
+  return cleanKey;
+}
+
 /** Construit un résultat film structuré à partir de la réponse TMDB, des images et des mots-clés. */
 export function mapMovieResult(data: TmdbResponse, images: TmdbImagesResponse, keywords: TmdbResponse = {} as TmdbResponse): MovieResult {
   const videos = mapVideos((data as { videos?: { results?: Array<Record<string, unknown>> } }).videos);
@@ -254,7 +275,7 @@ export function mapMovieResult(data: TmdbResponse, images: TmdbImagesResponse, k
     posters: pickByLanguages(images.posters, ['en', 'fr'], 2),
     videos,
     keywords: kwData.map((k) => k.name).filter(Boolean),
-    videos_link: videos.map((v) => `https://www.youtube.com/watch?v=${v.key}`),
+    videos_link: videos.map(buildVideoLink).filter(Boolean),
   };
 }
 
@@ -286,9 +307,7 @@ export function mapEpisodeResult(episode: TmdbResponse, showId: number): Episode
     vote_average: typeof episode.vote_average === 'number' ? episode.vote_average : 0,
     vote_count: typeof episode.vote_count === 'number' ? episode.vote_count : 0,
     images: String(images.still_path ?? episode.still_path ?? ''),
-    videos_link: videos
-      .map((v) => `https://www.youtube.com/watch?v=${String(v.key ?? '')}`)
-      .filter(Boolean),
+    videos_link: videos.map(buildVideoLink).filter(Boolean),
   };
 }
 
