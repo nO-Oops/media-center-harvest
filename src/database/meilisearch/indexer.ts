@@ -57,12 +57,13 @@ export class MeilisearchIndexer {
         errors.push("Document sans id unique ignoré");
         continue;
       }
-      const indexName = (doc as { indexName?: string }).indexName ?? "movies";
+      const indexName = doc.indexName;
       const bucket = byIndex.get(indexName) ?? [];
       bucket.push(doc);
       byIndex.set(indexName, bucket);
     }
 
+    let added = 0;
     for (const [indexName, docs] of byIndex.entries()) {
       const index = this.indexes[indexName];
       if (!index) {
@@ -70,10 +71,11 @@ export class MeilisearchIndexer {
         continue;
       }
       try {
-        const task = await retryWithBackoff(() => index.addDocuments(docs as never), {
+        const task = await retryWithBackoff(() => index.addDocuments(docs), {
           onRetry: ({ attempt, delay }) =>
             logger.warn(`Indexation ${indexName} - tentative ${attempt} dans ${delay}ms`),
         });
+        added += docs.length;
         logger.debug(`Indexation ${indexName} : ${docs.length} document(s), task ${task.taskUid}`);
       } catch (error) {
         const message = (error as Error).message;
@@ -82,6 +84,6 @@ export class MeilisearchIndexer {
       }
     }
 
-    return { added: documents.length, errors };
+    return { added, errors };
   }
 }
