@@ -5,7 +5,33 @@ import { retryWithBackoff } from '../../utils/retry';
 import { randomDelay } from '../../utils/delay';
 import { randomHeaders } from '../../utils/userAgent';
 import { logger } from '../../utils/logger';
-import { mapTmdbMovie, mapTmdbShow, mapTmdbPerson, TmdbResponse } from './tmdbMapper';
+import {
+  mapTmdbMovie,
+  mapTmdbShow,
+  mapTmdbPerson,
+  imageUrl,
+  TmdbResponse,
+  mapMovieResult,
+  mapShowResult,
+  mapEpisodeResult,
+  mapPersonResult,
+  mapActorCredits,
+  mapCastAndCrew,
+  mapSearchItems,
+} from './tmdbMapper';
+import type {
+  ActorCreditsResult,
+  CastAndCrewResult,
+  EpisodeResult,
+  MovieResult,
+  PersonResult,
+  SearchItem,
+  ShowResult,
+  TmdbImagesResponse,
+} from './types';
+
+/** Base de l'API TMDB (v3). */
+const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
 /** Mapping des noms de genre TMDB vers leurs IDs (sous-ensemble courant). */
 const GENRE_ID: Record<string, number> = {
@@ -34,6 +60,10 @@ const GENRE_ID: Record<string, number> = {
  *
  * C'est la **seule** couche TMDB du projet : les scrapers web (DidVIP, HDS)
  * l'utilisent pour l'enrichissement et ne réimplémentent jamais les appels API.
+ *
+ * Elle expose à la fois l'interface commune `MediaSource` (`scrape`) et une API
+ * backend structurée (méthodes de lecture : films, séries, acteurs…) utilisée
+ * exclusivement par le backend, sans accès utilisateur.
  */
 export class TmdbSource implements MediaSource {
   readonly name = HarvestSource.TMDB;
@@ -50,7 +80,7 @@ export class TmdbSource implements MediaSource {
     // de TMDB_API_KEY soit gérée par la dégradation gracieuse au moment de la
     // requête.
     this.apiKey = config.tmdbApiKey;
-    this.baseUrl = 'https://api.tmdb.org/v3';
+    this.baseUrl = TMDB_BASE_URL;
     this.minDelay = config.requestDelayMin;
     this.maxDelay = config.requestDelayMax;
   }
@@ -200,5 +230,75 @@ export class TmdbSource implements MediaSource {
       return [];
     }
     return results.slice(0, number) as TmdbResponse[];
+  }
+
+  // ---------------------------------------------------------------------------
+  // API backend structurée (lecture) — utilisée exclusivement par le backend.
+  // ---------------------------------------------------------------------------
+
+  /** Récupère les détails enrichis d'un film (crédits, vidéos, mots-clés, images). */
+  async getMovieById(tmdbId: number): Promise<MovieResult> {
+    const [base, images, keywords] = await Promise.all([
+      this.request(`/movie/${tmdbId}`, { append_to_response: 'credits,videos' }),
+      this.request(`/movie/${tmdbId}/images`, {}),
+      this.request(`/movie/${tmdbId}/keywords`, {}),
+    ]);
+    return mapMovieResult(base as TmdbResponse, images as TmdbImagesResponse, keywords as TmdbResponse);
+  }
+
+  /** Recherche des films par titre. */
+  async searchMoviesByTitle(title: string): Promise<SearchItem[]> {
+    const data = await this.request('/search/movie', { query: title, page: 1 });
+    return mapSearchItems(data.results, 'movie');
+  }
+
+  /** Récupère les détails d'une série TV. */
+  async getSeriesById(tmdbId: number): Promise<ShowResult> {
+    const data = await this.request(`/tv/${tmdbId}`, {});
+    return mapShowResult(data as TmdbResponse);
+  }
+
+  /** Recherche des séries TV par titre. */
+  async searchSeriesByTitle(title: string): Promise<SearchItem[]> {
+    const data = await this.request('/search/tv', { query: title, page: 1 });
+    return mapSearchItems(data.results, 'tv');
+  }
+
+  /** Récupère les détails d'un acteur / personne. */
+  async getActorById(tmdbId: number): Promise<PersonResult> {
+    const data = await this.request(`/person/${tmdbId}`, {});
+    return mapPersonResult(data as TmdbResponse);
+  }
+
+  /** Recherche des acteurs par prénom et/ou nom. */
+  async searchActorsByName(firstname: string, name: string): Promise<SearchItem[]> {
+    const query = [firstname, name].filter((part) => part && part.trim()).join(' ').trim();
+    const data = await this.request('/search/person', { query, page: 1 });
+    return mapSearchItems(data.results, 'person');
+  }
+
+  /** Récupère les crédits d'un acteur (films et séries). */
+  async getActorCredits(tmdbId: number): Promise<ActorCreditsResult> {
+    const data = await this.request(`/person/${tmdbId}`, { append_to_response: 'combined_credits' });
+    return mapActorCredits(data as TmdbResponse);
+  }
+
+  /** Récupère la distribution complète et l'équipe technique d'un média. */
+  async getCastAndCrew(tmdbId: number): Promise<CastAndCrewResult> {
+    try {
+      const movie = await this.getMovie(tmdbId);
+      return mapCastAndCrew(movie as TmdbResponse, 'movie');
+    } catch (error) {
+      logger.debug(`TMDB getCastAndCrew (${tmdbId}) en film échoué, tentative en série: ${(error as Error).message}`);
+      const show = await this.getShow(tmdbId);
+      return mapCastAndCrew(show as TmdbResponse, 'tv');
+    }
+  }
+
+  /** Récupère la liste des épisodes d'une saison donnée. */
+  async getSeasonEpisodes(tmdbId: number, seasonNumber: number): Promise<EpisodeResult[]> {
+    const data = await this.request(`/tv/${tmdbId}/season/${seasonNumber}`, {});
+    const episodes = (data.episodes as Array<TmdbResponse>) ?? [];
+    return episodes.map((episode) => mapEpisodeResult(episode, tmdbId));
   }
 }
