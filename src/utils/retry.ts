@@ -23,7 +23,13 @@ export interface RetryOptions {
   onRetry?: (info: { attempt: number; delay: number; error: unknown }) => void;
 }
 
-/** Informations retournées par une opération en cas d'échec définitif. */
+/**
+ * Informations retournées par une opération en cas d'échec définitif.
+ *
+ * Le paramètre de type `T` est conservé pour préserver la compatibilité arrière
+ * de cet export public (breaking change consigné dans CHANGELOG.md) ; il n'est pas
+ * utilisé dans la définition mais fait partie de la signature documentée.
+ */
 export interface RetryFailure<T> {
   /** Dernière erreur rencontrée. */
   error: unknown;

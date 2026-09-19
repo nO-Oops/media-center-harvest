@@ -70,6 +70,12 @@ function parseIntPositive(value: string): number {
  *
  * Le programme est construit sans exécution : `runCli()` appelle `.parse()`.
  * Cela le rend réutilisable et testable hors du cycle de vie du processus.
+ *
+ * Le paramètre `config` fait partie du contrat d'injection de dépendances de la
+ * factory (cf. conception, L.157) et préserve sa réutilisabilité ; il n'est pas
+ * encore utilisé pour surcharger les valeurs par défaut des options.
+ *
+ * @param config Configuration de l'application (injection de dépendances).
  */
 export function createProgram(config: AppConfig): Command {
   const program = new Command("media-scraper");
