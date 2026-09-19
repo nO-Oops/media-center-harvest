@@ -2,7 +2,7 @@
 
 - **Branche ciblée** : `feature/media-harvester-20260813` (issue `01-010_media-harvester.yaml`)
 - **Racine du projet cible** : `/Users/oops/Projects/MediaCenter/media-center-harvest`
-- **Date de l'analyse** : 2026-09-18
+- **Date de l'analyse** : 2026-09-19 (réanalyse — code inchangé depuis la version du 2026-09-18)
 - **Sous-recettes exécutées** : `code_context_analysis_current_branch`, `code_quality_analysis`, `code_test_review_analysis`
 - **Sous-recette non exécutée** : `code_api_compatibility` (l'application n'est **pas** une API — cf. justification ci-dessous)
 
@@ -12,9 +12,9 @@
 
 La branche `feature/media-harvester-20260813` implémente le **moissonnage de données média** (films, séries TV, documentaires) à partir de l'**API TMDB**, normalisé selon un modèle canonique et indexé dans **Meilisearch**. Il s'agit d'une implémentation à partir de zéro (**42 fichiers, +7818 lignes, 0 suppression**), issue de l'ADR acceptée `adr-media-harvester.md`.
 
-**État des prérequis (Étape 0)** : ✅ **Validé**. Le `git status` du projet (hors répertoire `.goose/`) est **propre** ; la `feature_branch` du fichier de tâche correspond à la branche courante.
+**État des prérequis (Étape 0)** : ✅ **Validé**. Le `git status` du projet (hors répertoire `.goose/`) est **propre** ; la `feature_branch` du fichier de tâche (`feature/media-harvester-20260813`) correspond à la branche courante.
 
-**Synthèse des trois analyses :**
+**Synthèse des trois analyses** (confirmées par réexécution le 2026-09-19) :
 
 | Analyse | Score / État | Livrable généré |
 |---|---|---|
@@ -26,13 +26,19 @@ La branche `feature/media-harvester-20260813` implémente le **moissonnage de do
 
 **Point bloquant fonctionnel :** la fonction `extractVideoUrls` (`src/sources/tmdb/tmdbMapper.ts:144-159`) **retourne toujours un tableau vide**, rendant la fonctionnalité d'extraction de liens vidéo (au cahier des charges) non opérationnelle. Ce défaut n'a **pas été capté** par les tests.
 
+**Méthodologie de réanalyse (2026-09-19) :**
+- `git diff --stat 2b1df12 HEAD -- src tests` → **aucun changement** depuis l'implémentation.
+- `npx tsc --noEmit` → **OK** (0 erreur).
+- `npx jest --coverage` → **63/63 verts**, couverture globale **73,79 % stmts / 72,42 % branches** ; `tmdbSource.ts` à **16,66 % stmts / 0 % branches** (cœur métier non mocké).
+- Vérification manuelle de `extractVideoUrls` + `isValidVideoUrl` → **bug confirmé** (L.148-155 non couvertes).
+
 ---
 
 ## 2. Résultats critiques
 
 | # | Source | Élément | Description | Impact |
 |---|---|---|---|---|
-| C1 | Qualité + Tests | `src/sources/tmdb/tmdbMapper.ts` (`extractVideoUrls`, L.144-159) | La fonction ignore les sites `youtube`, puis reconstruit une URL `https://www.youtube.com/watch?v=…` pour les autres sites. Or `isValidVideoUrl()` exige une extension vidéo (`.m3u8`/`.mp4`/…) — une URL YouTube ne s'y conforme jamais. **`media.videoLinks` est donc constamment vide.** | **Défaut fonctionnel sur une fonctionnalité centrale** du cahier des charges. Non capté par les tests (angle manquant). |
+| C1 | Qualité + Tests | `src/sources/tmdb/tmdbMapper.ts` (`extractVideoUrls`, L.144-159) | La fonction ignore les sites `youtube`, puis reconstruit une URL `https://www.youtube.com/watch?v=…` pour les autres sites. Or `isValidVideoUrl()` exige une extension vidéo (`.m3u8`/`.mp4`/…) — une URL YouTube ne s'y conforme jamais. **`media.videoLinks` est donc constament vide.** | **Défaut fonctionnel sur une fonctionnalité centrale** du cahier des charges. Non capté par les tests (angle manquant). |
 | C2 | Tests | `src/sources/tmdb/tmdbSource.ts` | Client API TMDB (cœur métier, point d'entrée `MediaSource.scrape()`) couverte qu'à **~17 %** — réseau non mocké. | Risque de régression non détecté sur la fonctionnalité principale de moissonnage. |
 
 ---
@@ -65,7 +71,7 @@ La branche `feature/media-harvester-20260813` implémente le **moissonnage de do
 ## 5. Recommandation finale
 
 ### Justification de la non-exécution de `code_api_compatibility`
-L'application est un **outil de moissonnage** (client TMDB + indexeur Meilisearch + CLI), **et non un serveur API** : elle n'expose **aucun endpoint HTTP / route** et aucun contrat consommable par des tiers. Le périmètre de l'audit de compatibilité API (changements cassants, rétrocompatibilité, versioning, impact sur les consommateurs) **ne s'applique pas**. Cette sous-recette a donc été volontairement exclue.
+L'application est un **outil de moissonnage** (client TMDB + indexeur Meilisearch + CLI), **et non un serveur API** : elle n'expose **aucun endpoint HTTP / route** et aucun contrat consommable par des tiers (aucune référence à `express`, `fastify` ou `http.createServer` dans `src/`). Le périmètre de l'audit de compatibilité API (changements cassants, rétrocompatibilité, versioning, impact sur les consommateurs) **ne s'applique pas**. Cette sous-recette a donc été volontairement exclue.
 
 ### Décision
 
