@@ -166,3 +166,9 @@ contraintes:
 
 metadata:
   feature_branch: feature/meilisearch-setup-20260815
+  coverage_before: 96.44
+  coverage_after: 98.75
+  step:
+    feature_generate: true
+    review_analysis: true
+    review_fix: true
