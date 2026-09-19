@@ -61,6 +61,42 @@ describe('tmdbMapper', () => {
       expect(media.genres).toEqual([]);
       expect(media.rating).toBe(0);
     });
+
+    it('extrait les flux directs valides et rejette les trailers YouTube', () => {
+      const media = mapTmdbMovie({
+        id: 42,
+        title: 'Documentaire de test',
+        release_date: '2020-01-01',
+        videos: {
+          results: [
+            { site: 'YouTube', key: 'abc123', type: 'Trailer' },
+            { site: 'Vimeo', key: 'https://cdn.example.com/1080p/movie.mp4', type: 'Clip' },
+          ],
+        },
+      });
+      // Le trailer YouTube doit être ignoré ; le flux direct valide conservé.
+      expect(media.videoLinks).toEqual(['https://cdn.example.com/1080p/movie.mp4']);
+    });
+
+    it('retourne une liste vide quand tous les vidéos sont des trailers YouTube', () => {
+      const media = mapTmdbMovie({
+        id: 43,
+        title: 'Film sans flux direct',
+        release_date: '2021-05-05',
+        videos: {
+          results: [
+            { site: 'YouTube', key: 'aaa', type: 'Trailer' },
+            { site: 'Youtube', key: 'bbb', type: 'Teaser' },
+          ],
+        },
+      });
+      expect(media.videoLinks).toEqual([]);
+    });
+
+    it('retourne une liste vide en absence de métadonnées vidéo', () => {
+      const media = mapTmdbMovie({ id: 44, title: 'Sans vidéos' });
+      expect(media.videoLinks).toEqual([]);
+    });
   });
 
   describe('mapTmdbShow', () => {
@@ -77,6 +113,21 @@ describe('tmdbMapper', () => {
       expect(media.kind).toBe(MediaKind.SERIES);
       expect(media.year).toBe(2011);
       expect(media.genres).toEqual(['Sci-Fi & Fantasy']);
+    });
+
+    it("extrait les flux directs valides d'une série et rejette YouTube", () => {
+      const media = mapTmdbShow({
+        id: 1,
+        name: 'Série de test',
+        first_air_date: '2019-01-01',
+        videos: {
+          results: [
+            { site: 'YouTube', key: 'xyz', type: 'Trailer' },
+            { site: 'Official', key: 'https://srv-2.example.com/playlist.m3u8', type: 'Clip' },
+          ],
+        },
+      });
+      expect(media.videoLinks).toEqual(['https://srv-2.example.com/playlist.m3u8']);
     });
   });
 

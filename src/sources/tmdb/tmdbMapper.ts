@@ -140,6 +140,11 @@ export function mapTmdbPerson(data: Record<string, unknown>): Person {
  * Extrait les URLs des vidéos/trailers TMDB. Seules les URLs vers des flux
  * valides (hors YouTube) sont conservées ; les trailers YouTube sont ignorés
  * car ils ne correspondent pas aux formats supportés (m3u8/mp4/…).
+ *
+ * Correctif du défaut C1 : les sites non-Youtube sont validés en tant que flux
+ * directs (clé utilisée telle quelle). L'ancien code reconstruisait une URL
+ * `youtube.com/watch?v=…` pour ces sites, qui ne passait jamais la validation
+ * d'extension — rendant `videoLinks` constament vide.
  */
 function extractVideoUrls(data: Record<string, unknown>): string[] {
   const videos = (data.videos as { results?: Array<Record<string, unknown>> } | undefined)?.results;
@@ -147,12 +152,13 @@ function extractVideoUrls(data: Record<string, unknown>): string[] {
   for (const v of videos ?? []) {
     const site = String(v.site ?? '').toLowerCase();
     const key = String(v.key ?? '');
+    // Ignorer les trailers YouTube : pas de flux direct supporté.
     if (site === 'youtube' || !key) {
       continue;
     }
-    const url = `https://www.youtube.com/watch?v=${key}`;
-    if (isValidVideoUrl(url)) {
-      urls.push(url);
+    // Conserver uniquement les liens vers des flux directs valides (m3u8/mp4/…).
+    if (isValidVideoUrl(key)) {
+      urls.push(key);
     }
   }
   return urls;
