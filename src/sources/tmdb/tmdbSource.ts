@@ -8,8 +8,6 @@ import { logger } from "../../utils/logger";
 import {
   mapTmdbMovie,
   mapTmdbShow,
-  mapTmdbPerson,
-  imageUrl,
   TmdbResponse,
   mapMovieResult,
   mapShowResult,

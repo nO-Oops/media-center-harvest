@@ -27,8 +27,20 @@ describe("tmdbMapper — videos_link (per-site)", () => {
         release_date: "2020-01-01",
         videos: {
           results: [
-            { site: "YouTube", key: "dQw4w9WgXcQ", iso_639_1: "en", type: "Trailer", name: "Trailer" },
-            { site: "Vimeo", key: "https://cdn.example.com/1080p/movie.mp4", iso_639_1: "en", type: "Clip", name: "Clip" },
+            {
+              site: "YouTube",
+              key: "dQw4w9WgXcQ",
+              iso_639_1: "en",
+              type: "Trailer",
+              name: "Trailer",
+            },
+            {
+              site: "Vimeo",
+              key: "https://cdn.example.com/1080p/movie.mp4",
+              iso_639_1: "en",
+              type: "Clip",
+              name: "Clip",
+            },
           ],
         },
       };
@@ -46,7 +58,13 @@ describe("tmdbMapper — videos_link (per-site)", () => {
         release_date: "2020-01-01",
         videos: {
           results: [
-            { site: "Vimeo", key: "https://cdn.example.com/1080p/movie.mp4", iso_639_1: "en", type: "Clip", name: "Clip" },
+            {
+              site: "Vimeo",
+              key: "https://cdn.example.com/1080p/movie.mp4",
+              iso_639_1: "en",
+              type: "Clip",
+              name: "Clip",
+            },
           ],
         },
       };
@@ -69,7 +87,13 @@ describe("tmdbMapper — videos_link (per-site)", () => {
         videos: {
           results: [
             { site: "YouTube", key: "abc123", iso_639_1: "en", type: "Trailer", name: "Trailer" },
-            { site: "Dailymotion", key: "https://cdn.dm.example.com/1080p/ep.m3u8", iso_639_1: "en", type: "Clip", name: "Clip" },
+            {
+              site: "Dailymotion",
+              key: "https://cdn.dm.example.com/1080p/ep.m3u8",
+              iso_639_1: "en",
+              type: "Clip",
+              name: "Clip",
+            },
           ],
         },
       };
@@ -88,7 +112,13 @@ describe("tmdbMapper — videos_link (per-site)", () => {
         name: "Épisode 2",
         videos: {
           results: [
-            { site: "Official", key: "https://cdn.example.com/1080p/ep.mp4", iso_639_1: "en", type: "Clip", name: "Clip" },
+            {
+              site: "Official",
+              key: "https://cdn.example.com/1080p/ep.mp4",
+              iso_639_1: "en",
+              type: "Clip",
+              name: "Clip",
+            },
           ],
         },
       };
