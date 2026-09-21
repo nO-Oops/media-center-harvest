@@ -165,7 +165,7 @@ contraintes:
   - Les UUID v4 doivent être générés lors de l'ajout des documents, pas lors de la création des indexes
 
 metadata:
-  feature_branch: feature/meilisearch-setup-20260815
+  feature_branch: feature/meilisearch-setup
   coverage_before: 96.44
   coverage_after: 98.75
   step:

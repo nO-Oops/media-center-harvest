@@ -32,7 +32,7 @@ prompt: |
   Plusieurs sites seront utilisés au fur et à mesure.
 
 metadata:
-  feature_branch: "feature/media-harvester-20260813"
+  feature_branch: feature/media-harvester
   coverage_before:
     statements: 75.42
     branches: 76.1

@@ -86,7 +86,7 @@ Exigences techniques :
   - Récupérer des détails enrichis (distribution, équipe technique, images, bande-annonce)
 
 metadata:
-  feature_branch: feature/create-tmdb-api-20260814
+  feature_branch: feature/create-tmdb-api
   coverage_before:
     lines: 86.81
     branches: 61.25
