@@ -67,5 +67,48 @@ describe("meilisearch mappers", () => {
       expect(doc.type).toBe("actor");
       expect(doc.knownForMediaIds).toEqual(["1", "2"]);
     });
+
+    it("propage les champs enrichis vers la PersonDocument (index persons)", () => {
+      const person = {
+        id: "6193",
+        name: "Leonardo DiCaprio",
+        type: "actor" as const,
+        biography: "Acteur.",
+        profileUrl: "https://image.tmdb.org/t/p/w300/leo.jpg",
+        knownForMediaIds: ["1", "2"],
+        birthday: "1974-11-11",
+        deathday: null,
+        gender: 2,
+        place_of_birth: "Los Angeles, California, USA",
+        popularity: 8.06,
+        knownForDepartment: "Acting",
+      };
+      const doc = personToDocument(person);
+      expect(doc.indexName).toBe("persons");
+      expect(doc.birthday).toBe("1974-11-11");
+      expect(doc.deathday).toBeNull();
+      expect(doc.gender).toBe(2);
+      expect(doc.place_of_birth).toBe("Los Angeles, California, USA");
+      expect(doc.popularity).toBe(8.06);
+      expect(doc.knownForDepartment).toBe("Acting");
+    });
+
+    it("normalise les champs optionnels absents à null", () => {
+      const person = {
+        id: "9",
+        name: "Inconnu",
+        type: "other" as const,
+        biography: "",
+        profileUrl: "",
+        knownForMediaIds: [],
+      };
+      const doc = personToDocument(person);
+      expect(doc.birthday).toBeNull();
+      expect(doc.deathday).toBeNull();
+      expect(doc.gender).toBeNull();
+      expect(doc.place_of_birth).toBeNull();
+      expect(doc.popularity).toBeNull();
+      expect(doc.knownForDepartment).toBeNull();
+    });
   });
 });

@@ -67,6 +67,18 @@ export interface PersonDocument {
   profileUrl: string;
   /** Liste des IDs des médias connus. */
   knownForMediaIds: string[];
+  /** Date de naissance (ISO 8601) ou null. */
+  birthday?: string | null;
+  /** Date de décès (ISO 8601) ou null. */
+  deathday?: string | null;
+  /** Sexe (code genre TMDB) ou null. */
+  gender?: number | null;
+  /** Lieu de naissance. */
+  place_of_birth?: string | null;
+  /** Score de popularité TMDB. */
+  popularity?: number | null;
+  /** Département pour lequel la personne est connue (TMDB `known_for_department`). */
+  knownForDepartment?: string | null;
 }
 
 /**

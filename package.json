@@ -15,6 +15,8 @@
     "media-scraper": "node dist/index.js",
     "meilisearch:init": "node dist/database/meilisearch/migrate.js",
     "meilisearch:delete": "node dist/database/meilisearch/delete.js",
+    "meilisearch:delete-document": "node dist/database/meilisearch/deleteDocument.js",
+    "meilisearch:clear": "node dist/database/meilisearch/clear.js",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit -p tsconfig.json",

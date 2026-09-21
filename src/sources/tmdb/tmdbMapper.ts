@@ -79,74 +79,139 @@ function yearFromDate(date: unknown): number | undefined {
   return raw ? Number(raw.slice(0, 4)) : undefined;
 }
 
+/**
+ * Film/série accompagné de ses deux versions linguistiques : la langue
+ * originale (pour `title` / `overview`) et le français (pour `title_fr` /
+ * `overview_fr`). Remplit l'exigence : titre/aperçu dans la langue du film,
+ * et versions françaises distinctes.
+ */
+export interface LocalizedMedia {
+  original: TmdbResponse;
+  french: TmdbResponse;
+}
+
+/**
+ * Sépare une réponse (ou un objet `{ original, french }`) en ses deux versions.
+ * En fallback (données partielles d'un échec), les deux champs pointent vers
+ * la même réponse.
+ */
+function splitLocalization(
+  data: TmdbResponse | LocalizedMedia
+): { original: TmdbResponse; french: TmdbResponse } {
+  if (
+    data &&
+    typeof data === "object" &&
+    "original" in data &&
+    "french" in data
+  ) {
+    const loc = data as LocalizedMedia;
+    return { original: loc.original ?? {}, french: loc.french ?? {} };
+  }
+  return { original: data as TmdbResponse, french: data as TmdbResponse };
+}
+
 /** Construit un Media à partir d'une réponse TMDB (film). */
-export function mapTmdbMovie(data: Record<string, unknown>): Media {
-  const credits = (data.credits as { cast?: unknown; crew?: unknown } | undefined) ?? {};
+export function mapTmdbMovie(
+  data: TmdbResponse | LocalizedMedia
+): Media {
+  const { original, french } = splitLocalization(data);
+  const credits = (original.credits as { cast?: unknown; crew?: unknown } | undefined) ?? {};
   const directorNames = extractCrew(credits);
 
   return {
-    id: String(data.id),
+    id: randomUUID(),
     kind: MediaKind.MOVIE,
-    title: String(data.title ?? ""),
-    title_fr: data.original_title ? String(data.original_title) : undefined,
-    overview: String(data.overview ?? ""),
-    overview_fr: data.overview ? String(data.overview) : undefined,
-    year: yearFromDate(data.release_date),
-    genres: normalizeGenres(data.genres as never),
+    title: String(original.title ?? ""),
+    title_fr: french.title ? String(french.title) : undefined,
+    overview: String(original.overview ?? ""),
+    overview_fr: french.overview ? String(french.overview) : undefined,
+    year: yearFromDate(original.release_date),
+    genres: normalizeGenres(original.genres as never),
     cast: extractCast(credits),
     director: directorNames[0],
     crew: extractCrew(credits),
-    rating: typeof data.vote_average === "number" ? data.vote_average : 0,
-    posterUrls: [imageUrl(data.poster_path as string)].filter(Boolean),
-    backdropUrls: [imageUrl(data.backdrop_path as string, "w1280")].filter(Boolean),
-    tmdbId: typeof data.id === "number" ? data.id : undefined,
-    imdbId: typeof data.imdb_id === "string" ? data.imdb_id : undefined,
-    spokenLanguages: ((data.spoken_languages as Array<{ iso_639_1: string }>) ?? [])
+    rating: typeof original.vote_average === "number" ? original.vote_average : 0,
+    posterUrls: [imageUrl(original.poster_path as string)].filter(Boolean),
+    backdropUrls: [imageUrl(original.backdrop_path as string, "w1280")].filter(Boolean),
+    tmdbId: typeof original.id === "number" ? original.id : undefined,
+    imdbId: typeof original.imdb_id === "string" ? original.imdb_id : undefined,
+    spokenLanguages: ((original.spoken_languages as Array<{ iso_639_1: string }>) ?? [])
       .map((l) => l.iso_639_1)
       .filter(Boolean),
-    runtime: typeof data.runtime === "number" ? data.runtime : undefined,
-    videoLinks: extractVideoUrls(data),
+    runtime: typeof original.runtime === "number" ? original.runtime : undefined,
+    videoLinks: extractVideoUrls(original),
   };
 }
 
 /** Construit un Media à partir d'une réponse TMDB (série TV). */
-export function mapTmdbShow(data: Record<string, unknown>): Media {
-  const credits = (data.credits as { cast?: unknown; crew?: unknown } | undefined) ?? {};
+export function mapTmdbShow(data: TmdbResponse | LocalizedMedia): Media {
+  const { original, french } = splitLocalization(data);
+  const credits = (original.credits as { cast?: unknown; crew?: unknown } | undefined) ?? {};
   const directorNames = extractCrew(credits);
 
   return {
-    id: String(data.id),
+    id: randomUUID(),
     kind: MediaKind.SERIES,
-    title: String(data.name ?? data.original_name ?? ""),
-    title_fr: data.original_name ? String(data.original_name) : undefined,
-    overview: String(data.overview ?? ""),
-    overview_fr: data.overview ? String(data.overview) : undefined,
-    year: yearFromDate(data.first_air_date),
-    genres: normalizeGenres(data.genres as never),
+    title: String(original.name ?? original.original_name ?? ""),
+    title_fr: french.name ? String(french.name) : undefined,
+    overview: String(original.overview ?? ""),
+    overview_fr: french.overview ? String(french.overview) : undefined,
+    year: yearFromDate(original.first_air_date),
+    genres: normalizeGenres(original.genres as never),
     cast: extractCast(credits),
     director: directorNames[0],
     crew: extractCrew(credits),
-    rating: typeof data.vote_average === "number" ? data.vote_average : 0,
-    posterUrls: [imageUrl(data.poster_path as string)].filter(Boolean),
-    backdropUrls: [imageUrl(data.backdrop_path as string, "w1280")].filter(Boolean),
-    tmdbId: typeof data.id === "number" ? data.id : undefined,
-    spokenLanguages: ((data.spoken_languages as Array<{ iso_639_1: string }>) ?? [])
+    rating: typeof original.vote_average === "number" ? original.vote_average : 0,
+    posterUrls: [imageUrl(original.poster_path as string)].filter(Boolean),
+    backdropUrls: [imageUrl(original.backdrop_path as string, "w1280")].filter(Boolean),
+    tmdbId: typeof original.id === "number" ? original.id : undefined,
+    spokenLanguages: ((original.spoken_languages as Array<{ iso_639_1: string }>) ?? [])
       .map((l) => l.iso_639_1)
       .filter(Boolean),
-    runtime: typeof data.runtime === "number" ? data.runtime : undefined,
-    videoLinks: extractVideoUrls(data),
+    runtime: typeof original.runtime === "number" ? original.runtime : undefined,
+    videoLinks: extractVideoUrls(original),
   };
+}
+
+/**
+ * Mappe le département connu TMDB vers un rôle (type) de personne.
+ *
+ * Permet de ne plus figer `type` à "other" : le champ TMDB
+ * `known_for_department` (ex: "Acting", "Directing", "Writing") détermine le
+ * rôle principal de la personne.
+ */
+function mapPersonType(data: Record<string, unknown>): Person["type"] {
+  const department = String(data.known_for_department ?? "").toLowerCase();
+  if (department.includes("acting")) return "actor";
+  if (department.includes("directing")) return "director";
+  if (department.includes("writing")) return "writer";
+  if (department.includes("production") || department.includes("editing")) return "creator";
+  return "other";
 }
 
 /** Construit une Person à partir d'une réponse TMDB (personne). */
 export function mapTmdbPerson(data: Record<string, unknown>): Person {
+  const gender = typeof data.gender === "number" ? data.gender : null;
+  const birthday = typeof data.birthday === "string" ? data.birthday : null;
+  const deathday = typeof data.deathday === "string" ? data.deathday : null;
+  const placeOfBirth = typeof data.place_of_birth === "string" ? data.place_of_birth : null;
+  const popularity = typeof data.popularity === "number" ? data.popularity : null;
+  const knownForDepartment =
+    typeof data.known_for_department === "string" ? data.known_for_department : null;
+
   return {
-    id: String(data.id),
+    id: randomUUID(),
     name: String(data.name ?? ""),
-    type: "other",
+    type: mapPersonType(data),
     biography: data.biography ? String(data.biography) : "",
     profileUrl: imageUrl(data.profile_path as string, "w300"),
     knownForMediaIds: [],
+    birthday,
+    deathday,
+    gender,
+    place_of_birth: placeOfBirth,
+    popularity,
+    knownForDepartment,
   };
 }
 

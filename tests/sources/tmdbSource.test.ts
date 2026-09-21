@@ -107,14 +107,15 @@ describe("TmdbSource", () => {
       const res = await source.getMovie(550);
       expect(res).toEqual({ id: 550 });
       expect(spy.mock.calls[0][0]).toBe("/movie/550");
-      expect(spy.mock.calls[0][1]).toEqual({ append_to_response: "credits" });
+      expect(spy.mock.calls[0][1]).toEqual({ append_to_response: "credits", language: "fr" });
     });
 
-    it("getShow appelle /tv/{id}", async () => {
+    it("getShow appelle /tv/{id} avec credits et language=fr", async () => {
       const source = buildSource();
       const spy = jest.spyOn(source as any, "request").mockResolvedValue({ id: 1 } as any);
       await source.getShow(1);
       expect(spy.mock.calls[0][0]).toBe("/tv/1");
+      expect(spy.mock.calls[0][1]).toEqual({ append_to_response: "credits", language: "fr" });
     });
 
     it("getPerson appelle /person/{id}", async () => {
@@ -122,6 +123,52 @@ describe("TmdbSource", () => {
       const spy = jest.spyOn(source as any, "request").mockResolvedValue({ id: 2 } as any);
       await source.getPerson(2);
       expect(spy.mock.calls[0][0]).toBe("/person/2");
+    });
+  });
+
+  describe("getMovieLocalized / getShowLocalized", () => {
+    it("ne fait qu'un appel si la langue originale est le français", async () => {
+      const source = buildSource();
+      const spy = jest
+        .spyOn(source as any, "request")
+        .mockResolvedValue({ id: 550, original_language: "fr", title: "Fight Club" } as any);
+
+      const res = await source.getMovieLocalized(550);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(res).toEqual({ original: expect.objectContaining({ original_language: "fr" }), french: expect.anything() });
+      expect(res.original).toBe(res.french);
+    });
+
+    it("fait deux appels (fr puis langue originale) sinon", async () => {
+      const source = buildSource();
+      const spy = jest
+        .spyOn(source as any, "request")
+        .mockResolvedValueOnce({ id: 550, original_language: "en" } as any)
+        .mockResolvedValueOnce({ id: 550, title: "Fight Club" } as any);
+
+      const res = await source.getMovieLocalized(550);
+
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy.mock.calls[0][0]).toBe("/movie/550");
+      expect(spy.mock.calls[0][1]).toEqual({ append_to_response: "credits", language: "fr" });
+      expect(spy.mock.calls[1][0]).toBe("/movie/550");
+      expect(spy.mock.calls[1][1]).toEqual({ append_to_response: "credits", language: "en" });
+      expect(res.original).toEqual({ id: 550, title: "Fight Club" });
+      expect(res.french).toEqual({ id: 550, original_language: "en" });
+    });
+
+    it("getShowLocalized utilise original_language de la série", async () => {
+      const source = buildSource();
+      const spy = jest
+        .spyOn(source as any, "request")
+        .mockResolvedValueOnce({ id: 1399, original_language: "en" } as any)
+        .mockResolvedValueOnce({ id: 1399, name: "Game of Thrones" } as any);
+
+      await source.getShowLocalized(1399);
+
+      expect(spy.mock.calls[1][0]).toBe("/tv/1399");
+      expect(spy.mock.calls[1][1]).toEqual({ append_to_response: "credits", language: "en" });
     });
   });
 
@@ -184,7 +231,7 @@ describe("TmdbSource", () => {
       });
       const res = await source.scrape({ type: "series" });
       expect(res.media).toHaveLength(1);
-      expect(res.media[0].id).toBe("1399");
+      expect(res.media[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
       expect(calls).toContain("/search/tv");
       expect(calls).toContain("/tv/1399");
     });
@@ -199,7 +246,7 @@ describe("TmdbSource", () => {
       });
       const res = await source.scrape({ type: "movie" });
       expect(res.media).toHaveLength(1);
-      expect(res.media[0].id).toBe("550");
+      expect(res.media[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
       expect(calls).toContain("/search/movie");
       expect(calls).toContain("/movie/550");
     });

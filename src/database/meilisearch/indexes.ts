@@ -39,7 +39,7 @@ export const EPISODES_SETTINGS = {
 /** Paramètres de recherche de l'index `persons`. */
 export const PERSONS_SETTINGS = {
   searchableAttributes: ["name", "biography"],
-  filterableAttributes: ["type"],
+  filterableAttributes: ["type", "gender", "known_for_department"],
   sortableAttributes: ["popularity", "birthday"],
 };
 

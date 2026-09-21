@@ -51,7 +51,7 @@ describe("tmdbMapper", () => {
     it("normalise un film avec genre français et cast trié", () => {
       const media = mapTmdbMovie(data);
       expect(media.kind).toBe(MediaKind.MOVIE);
-      expect(media.id).toBe("550");
+      expect(media.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
       expect(media.title).toBe("Fight Club");
       expect(media.year).toBe(1999);
       expect(media.genres).toEqual(["Drame"]);
@@ -72,6 +72,30 @@ describe("tmdbMapper", () => {
       expect(media.year).toBeUndefined();
       expect(media.genres).toEqual([]);
       expect(media.rating).toBe(0);
+    });
+
+    it("remplit overview_fr depuis l'aperçu localisé (language=fr)", () => {
+      const media = mapTmdbMovie({
+        id: 550,
+        title: "Fight Club",
+        overview: "Le narrateur, sans identité précise, vit seul.",
+      });
+      // L'aperçu français (renvoyé par /movie/{id}?language=fr) est copé dans
+      // overview_fr du document Meilisearch.
+      expect(media.overview).toBe("Le narrateur, sans identité précise, vit seul.");
+      expect(media.overview_fr).toBe("Le narrateur, sans identité précise, vit seul.");
+    });
+
+    it("remplit title_fr depuis le titre localisé en français", () => {
+      const media = mapTmdbMovie({
+        id: 550,
+        title: "Fight Club",
+        original_title: "Fight Club",
+      });
+      // title_fr doit contenir le titre français (champ localisé), et non le
+      // titre original anglais.
+      expect(media.title).toBe("Fight Club");
+      expect(media.title_fr).toBe("Fight Club");
     });
 
     it("extrait les flux directs valides et rejette les trailers YouTube", () => {
@@ -109,6 +133,37 @@ describe("tmdbMapper", () => {
       const media = mapTmdbMovie({ id: 44, title: "Sans vidéos" });
       expect(media.videoLinks).toEqual([]);
     });
+
+    it("met title/overview en langue originale et title_fr/overview_fr en français", () => {
+      const media = mapTmdbMovie({
+        original: {
+          id: 550,
+          title: "Fight Club",
+          overview: "A ticking-time-bomb insomniac...",
+          original_language: "en",
+        },
+        french: {
+          id: 550,
+          title: "Fight Club",
+          overview: "Un homme neurasthénique...",
+          original_language: "en",
+        },
+      });
+      // langue originale pour title/overview
+      expect(media.title).toBe("Fight Club");
+      expect(media.overview).toBe("A ticking-time-bomb insomniac...");
+      // français pour les suffixes _fr
+      expect(media.title_fr).toBe("Fight Club");
+      expect(media.overview_fr).toBe("Un homme neurasthénique...");
+    });
+
+    it("garde le fallback (réponse unique) pour title_fr/overview_fr", () => {
+      const media = mapTmdbMovie({ id: 1, title: "X", overview: "Y" });
+      expect(media.title).toBe("X");
+      expect(media.overview).toBe("Y");
+      expect(media.title_fr).toBe("X");
+      expect(media.overview_fr).toBe("Y");
+    });
   });
 
   describe("mapTmdbShow", () => {
@@ -127,6 +182,18 @@ describe("tmdbMapper", () => {
       expect(media.genres).toEqual(["Sci-Fi & Fantasy"]);
     });
 
+    it("remplit title_fr depuis le titre localisé en français", () => {
+      const media = mapTmdbShow({
+        id: 1399,
+        name: "Game of Thrones",
+        original_name: "Game of Thrones",
+      });
+      // title_fr doit contenir le titre français (champ localisé), et non le
+      // titre original.
+      expect(media.title).toBe("Game of Thrones");
+      expect(media.title_fr).toBe("Game of Thrones");
+    });
+
     it("extrait les flux directs valides d'une série et rejette YouTube", () => {
       const media = mapTmdbShow({
         id: 1,
@@ -141,6 +208,30 @@ describe("tmdbMapper", () => {
       });
       expect(media.videoLinks).toEqual(["https://srv-2.example.com/playlist.m3u8"]);
     });
+
+    it("met title/overview en langue originale et title_fr/overview_fr en français", () => {
+      const media = mapTmdbShow({
+        original: {
+          id: 1399,
+          name: "Attack on Titan",
+          original_name: "進撃の巨人",
+          overview: "Humans almost exterminated by Titans.",
+          original_language: "ja",
+        },
+        french: {
+          id: 1399,
+          name: "L'Attaque des Titans",
+          overview: "Dans un monde ravagé par des titans...",
+          original_language: "ja",
+        },
+      });
+      // langue originale pour title/overview
+      expect(media.title).toBe("Attack on Titan");
+      expect(media.overview).toBe("Humans almost exterminated by Titans.");
+      // français pour les suffixes _fr
+      expect(media.title_fr).toBe("L'Attaque des Titans");
+      expect(media.overview_fr).toBe("Dans un monde ravagé par des titans...");
+    });
   });
 
   describe("mapTmdbPerson", () => {
@@ -151,10 +242,57 @@ describe("tmdbMapper", () => {
         biography: "Acteur.",
         profile_path: "/p.jpg",
       });
-      expect(person.id).toBe("287");
+      expect(person.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
       expect(person.name).toBe("Brad Pitt");
       expect(person.biography).toBe("Acteur.");
       expect(person.profileUrl).toContain("w300/p.jpg");
+    });
+
+    it("enrichit la personne avec les champs TMDB (birthday, gender, place_of_birth, popularity, known_for_department)", () => {
+      const person = mapTmdbPerson({
+        id: 6193,
+        name: "Leonardo DiCaprio",
+        biography: "Acteur américain.",
+        profile_path: "/leo.jpg",
+        birthday: "1974-11-11",
+        deathday: null,
+        gender: 2,
+        place_of_birth: "Los Angeles, California, USA",
+        popularity: 8.06,
+        known_for_department: "Acting",
+      });
+      expect(person.birthday).toBe("1974-11-11");
+      expect(person.deathday).toBeNull();
+      expect(person.gender).toBe(2);
+      expect(person.place_of_birth).toBe("Los Angeles, California, USA");
+      expect(person.popularity).toBe(8.06);
+      expect(person.knownForDepartment).toBe("Acting");
+    });
+
+    it("déduit le type de la personne depuis known_for_department", () => {
+      expect(mapTmdbPerson({ id: 1, name: "A", known_for_department: "Acting" }).type).toBe(
+        "actor"
+      );
+      expect(mapTmdbPerson({ id: 2, name: "B", known_for_department: "Directing" }).type).toBe(
+        "director"
+      );
+      expect(mapTmdbPerson({ id: 3, name: "C", known_for_department: "Writing" }).type).toBe(
+        "writer"
+      );
+      expect(mapTmdbPerson({ id: 4, name: "D", known_for_department: "Production" }).type).toBe(
+        "creator"
+      );
+      expect(mapTmdbPerson({ id: 5, name: "E" }).type).toBe("other");
+    });
+
+    it("tolère les champs manquants", () => {
+      const person = mapTmdbPerson({ id: 1, name: "Sans tout" });
+      expect(person.birthday).toBeNull();
+      expect(person.deathday).toBeNull();
+      expect(person.gender).toBeNull();
+      expect(person.place_of_birth).toBeNull();
+      expect(person.popularity).toBeNull();
+      expect(person.knownForDepartment).toBeNull();
     });
   });
 });

@@ -10,6 +10,9 @@ function fakeIndex(addDocuments: jest.Mock): Index {
     uid: "movies",
     addDocuments,
     updateSettings: jest.fn().mockResolvedValue({ taskUid: 2 }),
+    deleteDocument: jest.fn().mockResolvedValue({ taskUid: 10 }),
+    deleteDocuments: jest.fn().mockResolvedValue({ taskUid: 11 }),
+    search: jest.fn().mockResolvedValue({ hits: [] }),
   } as unknown as Index;
 }
 
@@ -231,5 +234,77 @@ describe("MeilisearchIndexer.upsert — retry addDocuments (onRetry L.76)", () =
     expect(res.errors).toEqual([]);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+});
+
+describe("MeilisearchIndexer — suppression de documents", () => {
+  /** Client factice où l'index expose search/deleteDocument/deleteDocuments. */
+  function deleteClient(searchHits: Array<{ id: number | string }>) {
+    const deleteDocument = jest.fn().mockResolvedValue({ taskUid: 10 });
+    const deleteDocuments = jest.fn().mockResolvedValue({ taskUid: 11 });
+    const search = jest.fn().mockResolvedValue({ hits: searchHits });
+    const client = {
+      index: (_uid: string) =>
+        ({
+          uid: "movies",
+          addDocuments: jest.fn(),
+          updateSettings: jest.fn(),
+          deleteDocument,
+          deleteDocuments,
+          search,
+        }) as unknown as Index,
+    } as unknown as MeiliSearch;
+    return { client, deleteDocument, deleteDocuments, search };
+  }
+
+  it("deleteById appelle deleteDocument avec l'id et renvoie le taskUid", async () => {
+    const { client, deleteDocument } = deleteClient([]);
+    const indexer = new MeilisearchIndexer(client);
+
+    const taskUid = await indexer.deleteById("550", "movies");
+
+    expect(deleteDocument).toHaveBeenCalledWith("550");
+    expect(taskUid).toBe(10);
+  });
+
+  it("deleteById lance pour un index inconnu", async () => {
+    const { client } = deleteClient([]);
+    const indexer = new MeilisearchIndexer(client);
+    await expect(indexer.deleteById("1", "inconnue")).rejects.toThrow(/Index inconnue/);
+  });
+
+  it("deleteByAttribute cherche par filtre puis supprime par lot", async () => {
+    const { client, deleteDocuments, search } = deleteClient([
+      { id: 1 },
+      { id: 2 },
+    ]);
+    const indexer = new MeilisearchIndexer(client);
+
+    const deleted = await indexer.deleteByAttribute("tmdb_id", "1171145", "movies");
+
+    expect(search).toHaveBeenCalledWith("", { filter: 'tmdb_id=1171145', limit: 1000 });
+    expect(deleteDocuments).toHaveBeenCalledWith([1, 2]);
+    expect(deleted).toBe(2);
+  });
+
+  it("deleteByAttribute guillemette les valeurs non numériques (imdb_id)", async () => {
+    const { client, deleteDocuments, search } = deleteClient([{ id: "tt0137523" }]);
+    const indexer = new MeilisearchIndexer(client);
+
+    const deleted = await indexer.deleteByAttribute("imdb_id", "tt0137523", "movies");
+
+    expect(search).toHaveBeenCalledWith("", { filter: 'imdb_id="tt0137523"', limit: 1000 });
+    expect(deleteDocuments).toHaveBeenCalledWith(["tt0137523"]);
+    expect(deleted).toBe(1);
+  });
+
+  it("deleteByAttribute renvoie 0 et ne supprime rien en cas d'aucun match", async () => {
+    const { client, deleteDocuments } = deleteClient([]);
+    const indexer = new MeilisearchIndexer(client);
+
+    const deleted = await indexer.deleteByAttribute("tmdb_id", "999999", "movies");
+
+    expect(deleteDocuments).not.toHaveBeenCalled();
+    expect(deleted).toBe(0);
   });
 });

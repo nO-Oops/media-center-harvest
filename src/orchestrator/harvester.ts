@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "fs";
 import { HarvestResult, emptyResult, appendError } from "../sources/MediaSource";
 import { ScrapeParams } from "../sources/MediaSource";
+import { Media } from "../models/media";
 import { SourceRegistry } from "../sources";
 import { RateLimiter } from "../utils/delay";
 import { retryWithBackoff } from "../utils/retry";
@@ -73,6 +74,20 @@ export class Harvester {
     return this.processedIds.has(id);
   }
 
+  /**
+   * Calcule la clé de déduplication d'un média.
+   *
+   * L'`id` interne étant désormais un uuid v4 (non stable entre les exécutions),
+   * la déduplication inter-exécutions s'appui sur une clé stable : l'ID TMDB
+   * (`tmdbId`) puis l'ID IMDB (`imdbId`). À défaut, elle retombe sur l'`id`
+   * interne (utile pour les médias sans identifiant externe ni persistance).
+   */
+  private dedupKey(media: Media): string {
+    if (media.tmdbId != null) return `tmdb:${media.tmdbId}`;
+    if (media.imdbId) return `imdb:${media.imdbId}`;
+    return media.id;
+  }
+
   /** Marque un id comme traité. */
   markProcessed(id: string): void {
     if (id && !this.processedIds.has(id)) {
@@ -106,11 +121,12 @@ export class Harvester {
             logger.warn(`Source ${sourceName} - tentative ${attempt} dans ${delay}ms`),
         }
       );
-      // Déduplication par id interne.
+      // Déduplication par clé stable (tmdbId / imdbId / id).
       for (const media of harvested.media) {
-        if (!this.isProcessed(media.id)) {
+        const key = this.dedupKey(media);
+        if (!this.isProcessed(key)) {
           result.media.push(media);
-          this.markProcessed(media.id);
+          this.markProcessed(key);
         }
       }
       result.persons.push(...harvested.persons);

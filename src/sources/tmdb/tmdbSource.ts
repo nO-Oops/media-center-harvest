@@ -8,6 +8,7 @@ import { logger } from "../../utils/logger";
 import {
   mapTmdbMovie,
   mapTmdbShow,
+  LocalizedMedia,
   TmdbResponse,
   mapMovieResult,
   mapShowResult,
@@ -149,16 +150,75 @@ export class TmdbSource implements MediaSource {
     return this.safeResults(data.results, number);
   }
 
-  /** Récupère un film par son ID TMDB (avec crédits). */
+  /**
+   * Récupère un film par son ID TMDB (avec crédits).
+   *
+   * La requête demande la langue française (`language=fr`) afin que les champs
+   * localisés (overview, title…) soient renvoyés en français. C'est ce qui
+   * remplit correctement `overview_fr` dans le document Meilisearch (correctif
+   * : sans ce paramètre, TMDB renvoie l'aperçu anglais par défaut).
+   */
   async getMovie(id: number): Promise<TmdbResponse> {
-    const data = await this.request(`/movie/${id}`, { append_to_response: "credits" });
+    const data = await this.request(`/movie/${id}`, {
+      append_to_response: "credits",
+      language: "fr",
+    });
     return data;
   }
 
-  /** Récupère une série par son ID TMDB (avec crédits). */
+  /**
+   * Récupère une série par son ID TMDB (avec crédits).
+   *
+   * La requête demande la langue française (`language=fr`) afin que les champs
+   * localisés (title, overview…) soient renvoyés en français : c'est ce qui
+   * remplit correctement `title_fr` et `overview_fr` dans le document Meilisearch.
+   */
   async getShow(id: number): Promise<TmdbResponse> {
-    const data = await this.request(`/tv/${id}`, { append_to_response: "credits" });
+    const data = await this.request(`/tv/${id}`, {
+      append_to_response: "credits",
+      language: "fr",
+    });
     return data;
+  }
+
+  /**
+   * Récupère un film avec ses deux versions linguistiques : langue originale
+   * (pour `title` / `overview`) et française (pour `title_fr` / `overview_fr`).
+   * La langue originale est lue du champ `original_language` de la réponse
+   * française afin d'éviter un appel supplémentaire quand le film est déjà en
+   * français.
+   */
+  async getMovieLocalized(id: number): Promise<LocalizedMedia> {
+    const french = await this.request(`/movie/${id}`, {
+      append_to_response: "credits",
+      language: "fr",
+    });
+    const originalLanguage = (french.original_language as string) ?? "en";
+    if (originalLanguage === "fr") {
+      return { original: french, french };
+    }
+    const original = await this.request(`/movie/${id}`, {
+      append_to_response: "credits",
+      language: originalLanguage,
+    });
+    return { original, french };
+  }
+
+  /** Récupère une série avec ses deux versions linguistiques. */
+  async getShowLocalized(id: number): Promise<LocalizedMedia> {
+    const french = await this.request(`/tv/${id}`, {
+      append_to_response: "credits",
+      language: "fr",
+    });
+    const originalLanguage = (french.original_language as string) ?? "en";
+    if (originalLanguage === "fr") {
+      return { original: french, french };
+    }
+    const original = await this.request(`/tv/${id}`, {
+      append_to_response: "credits",
+      language: originalLanguage,
+    });
+    return { original, french };
   }
 
   /** Récupère une personne par son ID TMDB. */
@@ -218,13 +278,13 @@ export class TmdbSource implements MediaSource {
 
       if (params.type === "series") {
         for (const data of await this.searchShows(query, genre, page, number)) {
-          const full = await this.getShow(Number(data.id)).catch(() => data);
-          result.media.push(mapTmdbShow(full as TmdbResponse));
+          const full = await this.getShowLocalized(Number(data.id)).catch(() => data);
+          result.media.push(mapTmdbShow(full as LocalizedMedia));
         }
       } else {
         for (const data of await this.searchMovies(query, genre, page, number)) {
-          const full = await this.getMovie(Number(data.id)).catch(() => data);
-          result.media.push(mapTmdbMovie(full as TmdbResponse));
+          const full = await this.getMovieLocalized(Number(data.id)).catch(() => data);
+          result.media.push(mapTmdbMovie(full as LocalizedMedia));
         }
       }
     } catch (error) {

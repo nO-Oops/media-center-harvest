@@ -78,5 +78,11 @@ export function personToDocument(person: Person): PersonDocument {
     biography: person.biography,
     profileUrl: person.profileUrl,
     knownForMediaIds: person.knownForMediaIds,
+    birthday: person.birthday ?? null,
+    deathday: person.deathday ?? null,
+    gender: person.gender ?? null,
+    place_of_birth: person.place_of_birth ?? null,
+    popularity: person.popularity ?? null,
+    knownForDepartment: person.knownForDepartment ?? null,
   };
 }
