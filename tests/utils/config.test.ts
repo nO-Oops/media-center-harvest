@@ -66,6 +66,7 @@ describe("config", () => {
         maxConcurrency: 1,
         requestDelayMin: 1,
         requestDelayMax: 1,
+        maxPersonsPerHarvest: 30,
         logLevel: "info",
       })
     ).toBe(false);
@@ -77,6 +78,7 @@ describe("config", () => {
         maxConcurrency: 1,
         requestDelayMin: 1,
         requestDelayMax: 1,
+        maxPersonsPerHarvest: 30,
         logLevel: "info",
       })
     ).toBe(true);

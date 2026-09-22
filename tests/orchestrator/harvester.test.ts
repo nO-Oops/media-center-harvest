@@ -35,6 +35,7 @@ describe("Harvester", () => {
       maxConcurrency: 1,
       requestDelayMin: 0,
       requestDelayMax: 0,
+      maxPersonsPerHarvest: 30,
       logLevel: "silent",
     } as any);
     registry.register(fakeSource(mediaIds));

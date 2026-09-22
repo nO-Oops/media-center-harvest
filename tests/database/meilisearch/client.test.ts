@@ -24,6 +24,7 @@ const testConfig: AppConfig = {
   maxConcurrency: 3,
   requestDelayMin: 0,
   requestDelayMax: 0,
+  maxPersonsPerHarvest: 30,
   logLevel: "silent",
 };
 
@@ -36,7 +37,6 @@ describe("client Meilisearch (H3)", () => {
 
     it("utilise l'hôte et la clef du config", () => {
       createMeilisearchClient(testConfig);
-      const { MeiliSearch } = require("meilisearch");
       expect(MeiliSearch).toHaveBeenCalledWith({
         host: "http://127.0.0.1:7700",
         apiKey: "master-key",

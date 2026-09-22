@@ -107,6 +107,10 @@ export interface PersonResult {
   birthday: string;
   deathday: string;
   biography: string;
+  /** Notabilité TMDB de la personne (flottant, >0). */
+  popularity?: number;
+  /** Département TMDB pour lequel la personne est connue. */
+  known_for_department?: string;
 }
 
 /** Élément de crédit d'un acteur (film ou série). */

@@ -1,6 +1,9 @@
 import { MeilisearchIndexer } from "../../../src/database/meilisearch/indexer";
-import type { MeiliSearch, Index } from "meilisearch";
+import type { MeiliSearch, Index, Task } from "meilisearch";
 import type { MovieDocument } from "../../../src/models/documents";
+import { emptyMedia } from "../../../src/models/media";
+import { emptyResult } from "../../../src/sources/MediaSource";
+import { indexResults } from "../../../src/orchestrator/indexResults";
 import { MediaKind } from "../../../src/models/harvest";
 import { logger } from "../../../src/utils/logger";
 
@@ -16,13 +19,51 @@ function fakeIndex(addDocuments: jest.Mock): Index {
   } as unknown as Index;
 }
 
+/** Construit une tâche Meilisearch factice à statut donné. */
+function fakeTask(
+  status: Task["status"],
+  indexedDocuments = 0,
+  failCode = "invalid_document_id"
+): Task {
+  return {
+    uid: 1,
+    indexUid: "movies",
+    status,
+    type: "documentAdditionOrUpdate",
+    batchUid: null,
+    canceledBy: null,
+    details: { indexedDocuments },
+    error:
+      status === "failed"
+        ? {
+            message: 'Document identifier "tmdb:1699223" is invalid',
+            code: failCode,
+            type: "invalid_request",
+            link: "https://docs.meilisearch.com/errors",
+          }
+        : null,
+    duration: "PT0S",
+    startedAt: new Date(),
+    enqueuedAt: new Date(),
+    finishedAt: new Date(),
+  } as unknown as Task;
+}
+
 /** Construit un client Meilisearch factice : index(uid) renvoie un index mocké. */
-function fakeClient(opts: { addDocuments?: jest.Mock } = {}) {
+function fakeClient(opts: {
+  addDocuments?: jest.Mock;
+  taskStatus?: Task["status"];
+  indexedDocuments?: number;
+} = {}) {
   const addDocuments = opts.addDocuments ?? jest.fn().mockResolvedValue({ taskUid: 1 });
+  const waitForTask = jest
+    .fn()
+    .mockResolvedValue(fakeTask(opts.taskStatus ?? "succeeded", opts.indexedDocuments));
   const client = {
     index: (_uid: string) => fakeIndex(addDocuments),
+    waitForTask,
   } as unknown as MeiliSearch;
-  return { client, addDocuments };
+  return { client, addDocuments, waitForTask };
 }
 
 /** Factory d'un MovieDocument valide. */
@@ -220,6 +261,7 @@ describe("MeilisearchIndexer.upsert — retry addDocuments (onRetry L.76)", () =
           addDocuments,
           updateSettings: jest.fn(async () => ({ taskUid: 1 })),
         }) as unknown as Index,
+      waitForTask: jest.fn().mockResolvedValue(fakeTask("succeeded")),
     } as unknown as MeiliSearch;
     const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
     const indexer = new MeilisearchIndexer(client);
@@ -306,5 +348,62 @@ describe("MeilisearchIndexer — suppression de documents", () => {
 
     expect(deleteDocuments).not.toHaveBeenCalled();
     expect(deleted).toBe(0);
+  });
+});
+
+describe("MeilisearchIndexer.upsert — vérification du statut de tâche", () => {
+  it("échoue et ne compte rien quand la tâche échoue (ex. id de document invalide)", async () => {
+    const { client, addDocuments, waitForTask } = fakeClient({ taskStatus: "failed" });
+    const indexer = new MeilisearchIndexer(client);
+
+    const res = await indexer.upsert([movie("a"), movie("b")]);
+
+    // addDocuments dispatche le lot, waitForTask renvoie une tâche échouée.
+    expect(addDocuments).toHaveBeenCalledTimes(1);
+    expect(waitForTask).toHaveBeenCalledTimes(1);
+    // Aucun document compté ; une erreur consignée avec le code Meilisearch.
+    expect(res.added).toBe(0);
+    expect(res.errors).toHaveLength(1);
+    expect(res.errors[0]).toContain("Échec d'indexation movies");
+    expect(res.errors[0]).toContain('statut "failed"');
+    expect(res.errors[0]).toContain("invalid_document_id");
+  });
+
+  it("compte les documents uniquement quand la tâche réussit", async () => {
+    const { client } = fakeClient({ taskStatus: "succeeded", indexedDocuments: 2 });
+    const indexer = new MeilisearchIndexer(client);
+
+    const res = await indexer.upsert([movie("a"), movie("b")]);
+
+    expect(res.errors).toEqual([]);
+    expect(res.added).toBe(2);
+  });
+
+  it("remonte l'échec d'un bucket dans le résultat d'indexation (ok=false)", async () => {
+    // Cas d'origine : un film + sa personne. Les buckets movies ET persons
+    // échouent (tâche failed) => l'indexation entière est signalée comme échouée.
+    const { client } = fakeClient({ taskStatus: "failed" });
+    const indexer = new MeilisearchIndexer(client);
+
+    const result = emptyResult();
+    const media = emptyMedia(MediaKind.MOVIE);
+    media.id = "movie-1";
+    result.media.push(media);
+    result.persons.push({
+      id: "tmdb-1",
+      name: "Neo",
+      type: "actor",
+      biography: "",
+      profileUrl: "",
+      knownForMediaIds: ["movie-1"],
+    });
+
+    const indexResult = await indexResults(result, indexer);
+
+    expect(indexResult.ok).toBe(false);
+    // Une erreur par bucket échoué (movies + persons).
+    expect(indexResult.errors.length).toBe(2);
+    expect(indexResult.errors.some((e) => e.includes("persons"))).toBe(true);
+    expect(indexResult.submitted).toBe(0);
   });
 });

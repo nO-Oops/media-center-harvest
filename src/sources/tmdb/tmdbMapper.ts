@@ -199,8 +199,18 @@ export function mapTmdbPerson(data: Record<string, unknown>): Person {
   const knownForDepartment =
     typeof data.known_for_department === "string" ? data.known_for_department : null;
 
+  // Identifiant stable `tmdb-<id>` utilisé comme **clé de document Meilisearch**.
+  // Le séparateur est un tiret (et non un deux-points) : Meilisearch n'accepte
+  // que des identifiants composés de caractères alphanumériques, tirets (-) et
+  // underscores (_). Un deux-points rendrait le document invalide et ferait
+  // échouer l'indexation par lot entière (Meilisearch valide le batch atomique),
+  // ce qui expliquerait qu'aucune personne ne soit indexée. Ce préfixe reste
+  // cohérent avec la clé de déduplication des médias (tmdb:<id>) dans
+  // l'orchestrateur. En fallback (id manquant), on retombe sur un uuid aléatoire.
+  const id = typeof data.id === "number" ? `tmdb-${data.id}` : randomUUID();
+
   return {
-    id: randomUUID(),
+    id,
     name: String(data.name ?? ""),
     type: mapPersonType(data),
     biography: data.biography ? String(data.biography) : "",
@@ -414,6 +424,12 @@ export function mapPersonResult(data: TmdbResponse): PersonResult {
     typeof data.gender === "number"
       ? (GENDER_LABEL[data.gender] ?? String(data.gender))
       : String(data.gender ?? "");
+  const popularity =
+    typeof data.popularity === "number" ? data.popularity : undefined;
+  const known_for_department =
+    typeof data.known_for_department === "string"
+      ? data.known_for_department
+      : undefined;
   return {
     id: randomUUID(),
     name: String(data.name ?? ""),
@@ -423,6 +439,8 @@ export function mapPersonResult(data: TmdbResponse): PersonResult {
     birthday: String(data.birthday ?? ""),
     deathday: String(data.deathday ?? ""),
     biography: String(data.biography ?? ""),
+    popularity,
+    known_for_department,
   };
 }
 

@@ -24,6 +24,7 @@ const testConfig: AppConfig = {
   maxConcurrency: 3,
   requestDelayMin: 0,
   requestDelayMax: 0,
+  maxPersonsPerHarvest: 30,
   logLevel: "silent",
 };
 

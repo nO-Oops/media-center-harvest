@@ -10,7 +10,7 @@ jest.mock("../../src/utils/retry", () => ({
 }));
 
 /** Construit une source TMDB avec une clé factice. */
-function buildSource(apiKey = "test-key"): TmdbSource {
+function buildSource(apiKey = "test-key", config: Record<string, unknown> = {}): TmdbSource {
   return new TmdbSource({
     tmdbApiKey: apiKey,
     meilisearchHost: "",
@@ -19,6 +19,8 @@ function buildSource(apiKey = "test-key"): TmdbSource {
     requestDelayMin: 0,
     requestDelayMax: 0,
     logLevel: "silent",
+    maxPersonsPerHarvest: 30,
+    ...config,
   } as any);
 }
 
@@ -123,6 +125,36 @@ describe("TmdbSource", () => {
       const spy = jest.spyOn(source as any, "request").mockResolvedValue({ id: 2 } as any);
       await source.getPerson(2);
       expect(spy.mock.calls[0][0]).toBe("/person/2");
+    });
+
+    it("getPersonsByIds déduplique et appelle /person/{id} pour chaque id", async () => {
+      const source = buildSource();
+      const spy = jest
+        .spyOn(source as any, "request")
+        .mockResolvedValue({ id: 287, name: "Brad Pitt" } as any);
+      const res = await (source as any).getPersonsByIds([287, 287, 819]);
+      expect(res).toHaveLength(2);
+      // L'id dupliqué n'a été appelé qu'une fois.
+      const personCalls = spy.mock.calls.filter((c: any) => c[0].startsWith("/person/"));
+      expect(personCalls).toHaveLength(2);
+      expect(personCalls.map((c) => c[0])).toEqual(["/person/287", "/person/819"]);
+    });
+
+    it("getPersonsByIds ignore les ids invalides et les échecs individuels", async () => {
+      const source = buildSource();
+      const warnSpy = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+      const spy = jest
+        .spyOn(source as any, "request")
+        .mockImplementation(async (path: any) => {
+          if (path.startsWith("/person/")) throw new Error("HTTP 404");
+          return {} as any;
+        });
+      const res = await (source as any).getPersonsByIds([NaN, 287]);
+      // Seule la personne valide est tentée ; l'échec est ignoré.
+      expect(res).toEqual([]);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0][0]).toBe("/person/287");
+      expect(warnSpy).toHaveBeenCalled();
     });
   });
 
@@ -257,6 +289,126 @@ describe("TmdbSource", () => {
       const res = await source.scrape({ type: "movie" });
       expect(res.media).toEqual([]);
       expect(res.errors.length).toBeGreaterThan(0);
+    });
+
+    it("enrichit les personnes du cast avec tous leurs champs via /person/{id}", async () => {
+      const source = buildSource();
+      const calls: string[] = [];
+      (jest.spyOn(source as any, "request") as any).mockImplementation(async (path: string) => {
+        calls.push(path);
+        if (path === "/search/movie")
+          return { results: [{ id: 550, title: "Fight Club" }] } as any;
+        if (path.startsWith("/movie/"))
+          return {
+            id: 550,
+            title: "Fight Club",
+            release_date: "1999-10-15",
+            original_language: "en",
+            credits: {
+              cast: [
+                { id: 287, name: "Brad Pitt", character: "The Fighter", order: 0 },
+                { id: 819, name: "Edward Norton", character: "The Narrator", order: 1 },
+              ],
+            },
+          } as any;
+        if (path.startsWith("/person/")) {
+          const id = Number(path.split("/")[2]);
+          return {
+            id,
+            name: id === 287 ? "Brad Pitt" : "Edward Norton",
+            biography: "Biographie de la personne",
+            profile_path: "/p.jpg",
+            birthday: "1963-12-18",
+            gender: 1,
+            place_of_birth: "Shawnee, Oklahoma, USA",
+            popularity: 8.5,
+            known_for_department: "Acting",
+          } as any;
+        }
+        return {} as any;
+      });
+      const res = await source.scrape({ type: "movie" });
+      // Deux personnes du cast récupérées avec TOUS leurs champs.
+      expect(res.persons).toHaveLength(2);
+      const brad = res.persons.find((p) => p.name === "Brad Pitt");
+      expect(brad).toBeDefined();
+      expect(brad!.id).toBe("tmdb-287");
+      expect(brad!.biography).toBe("Biographie de la personne");
+      expect(brad!.birthday).toBe("1963-12-18");
+      expect(brad!.gender).toBe(1);
+      expect(brad!.place_of_birth).toBe("Shawnee, Oklahoma, USA");
+      expect(brad!.popularity).toBe(8.5);
+      expect(brad!.knownForDepartment).toBe("Acting");
+      // Les IDs du cast ont été fetchés via /person/{id}.
+      expect(calls).toContain("/person/287");
+      expect(calls).toContain("/person/819");
+    });
+
+    it("déduplique les personnes du cast entre plusieurs médias", async () => {
+      const source = buildSource();
+      (jest.spyOn(source as any, "request") as any).mockImplementation(async (path: string) => {
+        if (path === "/search/movie")
+          return { results: [{ id: 550 }, { id: 551 }] } as any;
+        if (path.startsWith("/movie/"))
+          return {
+            id: Number(path.split("/")[2]),
+            title: "Film",
+            release_date: "1999-10-15",
+            original_language: "en",
+            credits: { cast: [{ id: 287, name: "Brad Pitt", order: 0 }] },
+          } as any;
+        if (path.startsWith("/person/"))
+          return { id: Number(path.split("/")[2]), name: "Brad Pitt" } as any;
+        return {} as any;
+      });
+      const res = await source.scrape({ type: "movie" });
+      // Brad Pitt présent dans les deux films -> une seule personne.
+      expect(res.persons).toHaveLength(1);
+      expect(res.persons[0].id).toBe("tmdb-287");
+    });
+
+    it("limite le nombre de personnes récupérées par moissonnage", async () => {
+      const source = buildSource();
+      // 50 membres de cast -> seul le cap (30 par défaut) est récupéré.
+      const cast = Array.from({ length: 50 }, (_, i) => ({ id: 100 + i, name: `Cast ${i}`, order: i }));
+      (jest.spyOn(source as any, "request") as any).mockImplementation(async (path: string) => {
+        if (path === "/search/movie")
+          return { results: [{ id: 550 }] } as any;
+        if (path.startsWith("/movie/"))
+          return {
+            id: 550,
+            title: "Film",
+            release_date: "1999-10-15",
+            original_language: "en",
+            credits: { cast },
+          } as any;
+        return {} as any;
+      });
+      const res = await source.scrape({ type: "movie" });
+      expect(res.persons).toHaveLength(30);
+    });
+
+    it("ignore les échecs individuels de chargement de personne", async () => {
+      const source = buildSource();
+      const warnSpy = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+      (jest.spyOn(source as any, "request") as any).mockImplementation(async (path: string) => {
+        if (path === "/search/movie")
+          return { results: [{ id: 550 }] } as any;
+        if (path.startsWith("/movie/"))
+          return {
+            id: 550,
+            title: "Film",
+            release_date: "1999-10-15",
+            original_language: "en",
+            credits: { cast: [{ id: 287, name: "Brad Pitt", order: 0 }] },
+          } as any;
+        if (path.startsWith("/person/")) throw new Error("HTTP 404");
+        return {} as any;
+      });
+      const res = await source.scrape({ type: "movie" });
+      // La personne est absente (échec ignoré) mais le reste du moissonnage tient.
+      expect(res.persons).toHaveLength(0);
+      expect(warnSpy).toHaveBeenCalled();
     });
   });
 

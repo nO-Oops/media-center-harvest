@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Media, Person, Episode } from "../../models/media";
 import {
   MovieDocument,
@@ -66,6 +67,58 @@ export function episodeToDocument(episode: Episode): EpisodeDocument {
     vote_average: 0,
     still_path: episode.thumbnailUrl ?? null,
   };
+}
+
+/**
+ * Dérive les personnes liées à un média à partir de ses champs `cast`,
+ * `director` et `crew`.
+ *
+ * Utilisée à l'indexation pour créer automatiquement les documents de l'index
+ * `persons` (acteurs, réalisateur, équipe) associés à chaque média.
+ *
+ * Les identifiants sont des **uuid v4** aléatoires : une même personne liée au
+ * même média produira un `id` différent à chaque exécution, garantissant
+ * l'unicité des documents de l'index `persons`.
+ */
+export function personsFromMedia(media: Media): Person[] {
+  const mediaId = media.id;
+  const persons: Person[] = [];
+  const seen = new Set<string>();
+
+  const add = (name: string, type: Person["type"]): void => {
+    const clean = name.trim();
+    if (!clean || seen.has(clean)) {
+      return;
+    }
+    seen.add(clean);
+    const id = randomUUID();
+    persons.push({
+      id,
+      name: clean,
+      type,
+      biography: "",
+      profileUrl: "",
+      knownForMediaIds: [mediaId],
+    });
+  };
+
+  // Acteurs (cast).
+  for (const name of media.cast) {
+    add(name, "actor");
+  }
+  // Réalisateur (film / documentaire / série).
+  if (media.director) {
+    add(media.director, "director");
+  }
+  // Équipe technique (réalisateur exclu, déjà traité : scénaristes, producteur…).
+  for (const name of media.crew) {
+    if (name.trim() === media.director?.trim()) {
+      continue;
+    }
+    add(name, "writer");
+  }
+
+  return persons;
 }
 
 /** Convertit une Person vers une PersonDocument. */

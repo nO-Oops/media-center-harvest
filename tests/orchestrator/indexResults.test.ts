@@ -36,6 +36,112 @@ describe("indexResults", () => {
     expect((indexer.submitted[0] as any).indexName).toBe("showtv");
   });
 
+  it("crée les documents persons (acteurs, réalisateur, équipe) pour un film", async () => {
+    const indexer = mockIndexer();
+    const result = emptyResult();
+    const media = emptyMedia(MediaKind.MOVIE);
+    media.id = "movie-1";
+    media.director = "Nolan";
+    media.cast = ["DiCaprio", "Hardy"];
+    media.crew = ["Gruenwald"];
+    result.media.push(media);
+
+    await indexResults(result, indexer);
+
+    const persons = indexer.submitted.filter(
+      (d: any) => d.indexName === "persons"
+    ) as any[];
+    // 1 réalisateur + 2 acteurs + 1 équipe = 4 personnes
+    expect(persons).toHaveLength(4);
+
+    const byName = Object.fromEntries(persons.map((p: any) => [p.name, p.type]));
+    expect(byName["Nolan"]).toBe("director");
+    expect(byName["DiCaprio"]).toBe("actor");
+    expect(byName["Hardy"]).toBe("actor");
+    expect(byName["Gruenwald"]).toBe("writer");
+
+    for (const p of persons) {
+      expect(p.knownForMediaIds).toEqual(["movie-1"]);
+    }
+  });
+
+  it("crée les documents persons pour une série (showtv)", async () => {
+    const indexer = mockIndexer();
+    const result = emptyResult();
+    const media = emptyMedia(MediaKind.SERIES);
+    media.id = "show-1";
+    media.director = "Villeneuve";
+    media.cast = ["Lupita"];
+    result.media.push(media);
+
+    await indexResults(result, indexer);
+
+    const persons = indexer.submitted.filter(
+      (d: any) => d.indexName === "persons"
+    );
+    expect(persons).toHaveLength(2);
+    const byName = Object.fromEntries(persons.map((p: any) => [p.name, p.type]));
+    expect(byName["Villeneuve"]).toBe("director");
+    expect(byName["Lupita"]).toBe("actor");
+  });
+
+  it("enrichit la biographie des personnes dérivées depuis la source (TMDB)", async () => {
+    const indexer = mockIndexer();
+    const result = emptyResult();
+    const media = emptyMedia(MediaKind.MOVIE);
+    media.id = "movie-1";
+    media.director = "Nolan";
+    media.cast = ["DiCaprio"];
+    result.media.push(media);
+
+    // Personne de source (TMDB) portant le même nom+rôle qu'une personne
+    // dérivée, avec une biographie à enrichir.
+    result.persons.push({
+      id: "tmdb-1",
+      name: "DiCaprio",
+      type: "actor",
+      biography: "Acteur américain.",
+      profileUrl: "https://image.tmdb.org/t/p/w300/leo.jpg",
+      knownForMediaIds: ["tmdb-media-1"],
+    });
+
+    await indexResults(result, indexer);
+
+    const persons = indexer.submitted.filter(
+      (d: any) => d.indexName === "persons"
+    ) as any[];
+    const dicaprio = persons.find((p) => p.name === "DiCaprio");
+    expect(dicaprio).toBeDefined();
+    // La biographie (vide côté dérivé) est remplie depuis la source.
+    expect(dicaprio.biography).toBe("Acteur américain.");
+    // Le profil est également complété.
+    expect(dicaprio.profileUrl).toBe("https://image.tmdb.org/t/p/w300/leo.jpg");
+    // Les médias connus des deux origines sont accumulés.
+    expect(dicaprio.knownForMediaIds).toContain("movie-1");
+    expect(dicaprio.knownForMediaIds).toContain("tmdb-media-1");
+  });
+
+  it("déduplique les personnes dérivées entre plusieurs médias", async () => {
+    const indexer = mockIndexer();
+    const result = emptyResult();
+    const a = emptyMedia(MediaKind.MOVIE);
+    a.id = "movie-a";
+    a.director = "Nolan";
+    const b = emptyMedia(MediaKind.MOVIE);
+    b.id = "movie-b";
+    b.director = "Nolan";
+    result.media.push(a);
+    result.media.push(b);
+
+    await indexResults(result, indexer);
+
+    const persons = indexer.submitted.filter(
+      (d: any) => d.indexName === "persons"
+    );
+    // Le réalisateur commun "Nolan" n'apparaît qu'une seule fois.
+    expect(persons).toHaveLength(1);
+  });
+
   it("route les épisodes et les personnes vers leurs indexes", async () => {
     const indexer = mockIndexer();
     const result = emptyResult();

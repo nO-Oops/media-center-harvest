@@ -1,4 +1,5 @@
 import { MediaSource, HarvestResult, emptyResult, appendError } from "../MediaSource";
+import { Person } from "../../models/media";
 import { HarvestSource } from "../../models/harvest";
 import { AppConfig } from "../../utils/config";
 import { retryWithBackoff } from "../../utils/retry";
@@ -17,6 +18,7 @@ import {
   mapActorCredits,
   mapCastAndCrew,
   mapSearchItems,
+  mapTmdbPerson,
 } from "./tmdbMapper";
 import type {
   ActorCreditsResult,
@@ -71,6 +73,8 @@ export class TmdbSource implements MediaSource {
   private readonly baseUrl: string;
   private readonly minDelay: number;
   private readonly maxDelay: number;
+  /** Nombre maximal de personnes (cast) récupérées par appel de moissonnage. */
+  private readonly maxPersonsPerHarvest: number;
   private readonly cache = new Map<string, TmdbResponse>();
 
   constructor(config: AppConfig) {
@@ -82,6 +86,7 @@ export class TmdbSource implements MediaSource {
     this.baseUrl = TMDB_BASE_URL;
     this.minDelay = config.requestDelayMin;
     this.maxDelay = config.requestDelayMax;
+    this.maxPersonsPerHarvest = config.maxPersonsPerHarvest;
   }
 
   /**
@@ -226,11 +231,79 @@ export class TmdbSource implements MediaSource {
     return this.request(`/person/${id}`, {});
   }
 
+  /**
+   * Récupère les détails complets de plusieurs personnes à partir de leurs IDs
+   * TMDB.
+   *
+   * Les IDs sont dédupliqués et chaque personne est fetchée via l'endpoint
+   * `/person/{id}` (avec retry via `request`). Les échecs individuels sont
+   * ignorés (graceful degradation) afin qu'une personne manquante n'annule pas
+   * le chargement de l'ensemble du cast. Renvoie les réponses TMDB mappables.
+   */
+  async getPersonsByIds(ids: number[]): Promise<TmdbResponse[]> {
+    const unique = Array.from(new Set(ids.filter((id) => Number.isFinite(id))));
+    if (unique.length === 0) {
+      return [];
+    }
+    const concurrency = Math.min(5, unique.length);
+    const results: TmdbResponse[] = [];
+    for (let i = 0; i < unique.length; i += concurrency) {
+      const batch = await Promise.all(
+        unique.slice(i, i + concurrency).map((id) =>
+          this.request(`/person/${id}`, {}).catch((error) => {
+            logger.warn(
+              `TMDB : échec du chargement de la personne ${id} : ${(error as Error).message}`
+            );
+            return null;
+          })
+        )
+      );
+      for (const data of batch) {
+        if (data) {
+          results.push(data);
+        }
+      }
+    }
+    return results;
+  }
+
   /** Recherche une personne par nom. */
   async searchPeople(query: string, page = 1): Promise<TmdbResponse[]> {
     const data = await this.request("/search/person", { query, page });
     return this.safeResults(data.results, 20);
+
   }
+
+  /**
+   * Récupère les détails complets d'une personne à partir de son nom via
+   * l endpoint /person/{id}. Le meilleur match (popularité maximale) est
+   * sélectionné parmi les résultats de recherche.
+   */
+  async getPersonByName(name: string): Promise<PersonResult | null> {
+    const query = name.trim();
+    if (!query) {
+      return null;
+    }
+    const results = await this.searchPeople(query);
+    if (!results || results.length === 0) {
+      return null;
+    }
+    let best: TmdbResponse | null = results[0];
+    let bestScore = (best.popularity as number) ?? 0;
+    for (const item of results) {
+      const score = (item.popularity as number) ?? 0;
+      if (score > bestScore) {
+        best = item;
+        bestScore = score;
+      }
+    }
+    if (!best) {
+      return null;
+    }
+    const data = await this.getPerson(Number(best.id));
+    return mapPersonResult(data);
+  }
+
 
   /**
    * Distingue le type de média à partir d'un externe (imdb_id / tvdb_id) via
@@ -276,21 +349,76 @@ export class TmdbSource implements MediaSource {
       const genre = params.genre;
       const query = genre ?? "";
 
+      const localized: LocalizedMedia[] = [];
       if (params.type === "series") {
         for (const data of await this.searchShows(query, genre, page, number)) {
           const full = await this.getShowLocalized(Number(data.id)).catch(() => data);
+          localized.push(full as LocalizedMedia);
           result.media.push(mapTmdbShow(full as LocalizedMedia));
         }
       } else {
         for (const data of await this.searchMovies(query, genre, page, number)) {
           const full = await this.getMovieLocalized(Number(data.id)).catch(() => data);
+          localized.push(full as LocalizedMedia);
           result.media.push(mapTmdbMovie(full as LocalizedMedia));
         }
       }
+
+      // Enrichissement des personnes : récupère les champs complets de chaque
+      // membre du cast (biographie, dates, genre…) via /person/{id}. Les IDs
+      // sont extraits des crédits déjà chargés (gratuits), dédupliqués et
+      // limités à un cap configurable pour borner le nombre d'appels API.
+      const persons = await this.enrichCastPersons(localized);
+      result.persons.push(...persons);
     } catch (error) {
       appendError(result, (error as Error).message);
     }
     return result;
+  }
+
+  /**
+   * Récupère les détails complets des membres du cast d'une liste de médias.
+   *
+   * Les IDs du cast sont extraits des crédits déjà chargés (gratuits), dédupliqués
+   * par ID TMDB, triés par ordre (cast principal en premier), puis limités à
+   * `maxPersonsPerHarvest`. Chaque personne est fetchée via /person/{id} et
+   * mappée avec tous ses champs afin qu'elle soit indexée complète dans Meilisearch.
+   */
+  private async enrichCastPersons(localized: LocalizedMedia[]): Promise<Person[]> {
+    const ids = this.collectCastIds(localized);
+    if (ids.length === 0) {
+      return [];
+    }
+    const details = await this.getPersonsByIds(ids);
+    return details.map((data) => mapTmdbPerson(data));
+  }
+
+  /** Extrait les IDs du cast uniques, triés par ordre, limités à un cap. */
+  private collectCastIds(localized: LocalizedMedia[]): number[] {
+    const seen = new Set<number>();
+    const ordered: Array<{ id: number; order: number }> = [];
+    const addCast = (credits: unknown): void => {
+      const cast = (credits as { cast?: Array<{ id: number; order: number }> } | undefined)?.cast
+        ?? [];
+      for (const member of cast) {
+        if (!Number.isFinite(member.id)) {
+          continue;
+        }
+        if (seen.has(member.id)) {
+          continue;
+        }
+        seen.add(member.id);
+        ordered.push({ id: member.id, order: Number(member.order) ?? 999 });
+      }
+    };
+    for (const media of localized) {
+      addCast(media.original.credits);
+      if (media.french !== media.original) {
+        addCast(media.french.credits);
+      }
+    }
+    ordered.sort((a, b) => a.order - b.order);
+    return ordered.slice(0, this.maxPersonsPerHarvest).map((member) => member.id);
   }
 
   /** Filtre et limite une liste de résultats TMDB. */

@@ -1,4 +1,4 @@
-import type { MeiliSearch, Index } from "meilisearch";
+import type { MeiliSearch, Index, Task } from "meilisearch";
 import { retryWithBackoff } from "../../utils/retry";
 import { logger } from "../../utils/logger";
 import { ensureAllIndexes, INDEX_NAMES } from "./indexes";
@@ -122,12 +122,25 @@ export class MeilisearchIndexer {
         continue;
       }
       try {
-        const task = await retryWithBackoff(() => index.addDocuments(docs), {
-          onRetry: ({ attempt, delay }) =>
-            logger.warn(`Indexation ${indexName} - tentative ${attempt} dans ${delay}ms`),
-        });
+        // `addDocuments` ne fait QUE dispatcher la tâche : Meilisearch traite et
+        // valide les documents de façon asynchrone. On attend donc la fin du
+        // traitement (statut terminal) avant de compter : une validation échouée
+        // (ex. id de document invalide) rend la tâche « failed » sans lever
+        // d'exception, et serait autrement comptée à tort dans `added`.
+        const task = await retryWithBackoff(
+          () => this.enqueueAndWait(index, docs, indexName),
+          {
+            onRetry: ({ attempt, delay }) =>
+              logger.warn(`Indexation ${indexName} - tentative ${attempt} dans ${delay}ms`),
+          }
+        );
+        if (task.status !== "succeeded") {
+          throw new Error(this.formatTaskFailure(task));
+        }
+        // Un lot Meilisearch est atomique : au succès, tous les documents du lot
+        // sont indexés (indexedDocuments === documents soumis).
         added += docs.length;
-        logger.debug(`Indexation ${indexName} : ${docs.length} document(s), task ${task.taskUid}`);
+        logger.debug(`Indexation ${indexName} : ${docs.length} document(s) indexés, task ${task.uid}`);
       } catch (error) {
         const message = (error as Error).message;
         errors.push(`Échec d'indexation ${indexName} : ${message}`);
@@ -136,5 +149,47 @@ export class MeilisearchIndexer {
     }
 
     return { added, errors };
+  }
+
+  /** Délai d'attente de finalisation d'une tâche d'indexation (ms). */
+  private readonly waitTimeoutMs = 60_000;
+  /** Période de sonnage de l'état d'une tâche pendant l'attente (ms). */
+  private readonly waitIntervalMs = 100;
+
+  /**
+   * Soumet un lot de documents puis attend sa finalisation (statut terminal).
+   *
+   * Renvvoie la tâche une fois terminée, qu'elle ait réussi ou échoué : c'est
+   * à l'appelant de vérifier `task.status`. Les erreurs transitoires (réseau,
+   * timeout) sont retentées par l'appelant (`upsert`).
+   */
+  private async enqueueAndWait(
+    index: Index,
+    docs: MeilisearchDocument[],
+    indexName: string
+  ): Promise<Task> {
+    const enqueued = await index.addDocuments(docs);
+    return this.client.waitForTask(enqueued.taskUid, {
+      timeOutMs: this.waitTimeoutMs,
+      intervalMs: this.waitIntervalMs,
+    });
+  }
+
+  /** Formate un message d'échec à partir d'une tâche Meilisearch terminée. */
+  private formatTaskFailure(task: Task): string {
+    const base = `statut "${task.status}"`;
+    const reason = this.describeTaskError(task.error);
+    return reason ? `${base} : ${reason}` : base;
+  }
+
+  /** Extrait une description lisible d'une erreur Meilisearch (message + code). */
+  private describeTaskError(error: unknown): string {
+    if (error && typeof error === "object") {
+      const e = error as Record<string, unknown>;
+      const message = typeof e.message === "string" ? e.message : "erreur de validation Meilisearch";
+      const code = typeof e.code === "string" && e.code ? ` (${e.code})` : "";
+      return `${message}${code}`;
+    }
+    return "erreur de validation Meilisearch";
   }
 }

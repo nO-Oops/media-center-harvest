@@ -13,6 +13,8 @@ export interface AppConfig {
   meilisearchMasterKey: string;
   /** Concurrence maximale des scrapers. */
   maxConcurrency: number;
+  /** Nombre maximal de personnes (cast) récupérées par appel de moissonnage. */
+  maxPersonsPerHarvest: number;
   /** Délai minimum entre deux requêtes (ms). */
   requestDelayMin: number;
   /** Délai maximum entre deux requêtes (ms). */
@@ -41,6 +43,7 @@ export function loadConfig(): AppConfig {
     meilisearchHost: process.env.MEILISEARCH_HOST ?? "http://127.0.0.1:7700",
     meilisearchMasterKey: process.env.MEILISEARCH_MASTER_KEY ?? "",
     maxConcurrency: intEnv("MAX_CONCURRENT_SCRAPERS", 3),
+    maxPersonsPerHarvest: intEnv("MAX_PERSONS_PER_HARVEST", 30),
     requestDelayMin: intEnv("REQUEST_DELAY_MIN", 2000),
     requestDelayMax: intEnv("REQUEST_DELAY_MAX", 5000),
     logLevel: process.env.LOG_LEVEL ?? "info",

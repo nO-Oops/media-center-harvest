@@ -2,6 +2,7 @@ import {
   mediaToMovieDocument,
   mediaToShowTvDocument,
   personToDocument,
+  personsFromMedia,
 } from "../../src/database/meilisearch/mappers";
 import { emptyMedia } from "../../src/models/media";
 import { MediaKind } from "../../src/models/harvest";
@@ -109,6 +110,71 @@ describe("meilisearch mappers", () => {
       expect(doc.place_of_birth).toBeNull();
       expect(doc.popularity).toBeNull();
       expect(doc.knownForDepartment).toBeNull();
+    });
+  });
+
+  describe("personsFromMedia", () => {
+    it("dérive les acteurs, le réalisateur et l'équipe d'un film", () => {
+      const media = emptyMedia(MediaKind.MOVIE);
+      media.id = "movie-1";
+      media.title = "Movie";
+      media.director = "Nolan";
+      media.cast = ["DiCaprio", "Bale"];
+      media.crew = ["Zanuck"];
+
+      const persons = personsFromMedia(media);
+
+      // 1 réalisateur + 2 acteurs + 1 membre de l'équipe
+      expect(persons).toHaveLength(4);
+
+      const byName = Object.fromEntries(persons.map((p) => [p.name, p.type]));
+      expect(byName["Nolan"]).toBe("director");
+      expect(byName["DiCaprio"]).toBe("actor");
+      expect(byName["Bale"]).toBe("actor");
+      expect(byName["Zanuck"]).toBe("writer");
+
+      for (const p of persons) {
+        expect(p.knownForMediaIds).toEqual(["movie-1"]);
+      }
+    });
+
+    it("dérive les personnes d'une série (showtv)", () => {
+      const media = emptyMedia(MediaKind.SERIES);
+      media.id = "show-1";
+      media.director = "Villeneuve";
+      media.cast = ["Lupita"];
+      media.crew = ["Gruenwald"];
+
+      const persons = personsFromMedia(media);
+      expect(persons).toHaveLength(3);
+
+      const byName = Object.fromEntries(persons.map((p) => [p.name, p.type]));
+      expect(byName["Villeneuve"]).toBe("director");
+      expect(byName["Lupita"]).toBe("actor");
+      expect(byName["Gruenwald"]).toBe("writer");
+    });
+
+    it("génère des ids uuid v4 uniques", () => {
+      const media = emptyMedia(MediaKind.MOVIE);
+      media.id = "movie-1";
+      media.director = "Nolan";
+      media.cast = ["DiCaprio"];
+
+      const persons = personsFromMedia(media);
+      const uuidV4Regex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+      for (const p of persons) {
+        expect(p.id).toMatch(uuidV4Regex);
+      }
+
+      // Les ids sont uniques au sein d'un même média.
+      expect(new Set(persons.map((p) => p.id)).size).toBe(persons.length);
+    });
+
+    it("ne génère rien sans casting ni équipe", () => {
+      const media = emptyMedia(MediaKind.MOVIE);
+      expect(personsFromMedia(media)).toHaveLength(0);
     });
   });
 });

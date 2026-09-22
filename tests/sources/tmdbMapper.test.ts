@@ -242,7 +242,7 @@ describe("tmdbMapper", () => {
         biography: "Acteur.",
         profile_path: "/p.jpg",
       });
-      expect(person.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      expect(person.id).toBe("tmdb-287");
       expect(person.name).toBe("Brad Pitt");
       expect(person.biography).toBe("Acteur.");
       expect(person.profileUrl).toContain("w300/p.jpg");
@@ -293,6 +293,13 @@ describe("tmdbMapper", () => {
       expect(person.place_of_birth).toBeNull();
       expect(person.popularity).toBeNull();
       expect(person.knownForDepartment).toBeNull();
+    });
+
+    it("génère un uuid aléatoire si l'id TMDB est absent", () => {
+      const person = mapTmdbPerson({ name: "Sans id" });
+      expect(person.id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      );
     });
   });
 });
