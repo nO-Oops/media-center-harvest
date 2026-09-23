@@ -14,9 +14,12 @@ describe("DEBUG: persons indexing", () => {
       kind: MediaKind.MOVIE,
       title: "Fight Club",
       tmdbId: 550,
-      cast: ["Brad Pitt", "Edward Norton"],
+      cast: [
+        { id: "1", name: "Brad Pitt", character: null, profileUrl: "", order: 0 },
+        { id: "2", name: "Edward Norton", character: null, profileUrl: "", order: 1 },
+      ],
       director: "David Fincher",
-      crew: ["Jim Uhls"],
+      crew: [{ id: "crew-uhls", name: "Jim Uhls", job: "Screenplay" }],
     } as Media;
     result.media.push(media);
 

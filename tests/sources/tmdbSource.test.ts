@@ -167,8 +167,10 @@ describe("TmdbSource", () => {
 
       const res = await source.getMovieLocalized(550);
 
-      expect(spy).toHaveBeenCalledTimes(1);
-      expect(res).toEqual({ original: expect.objectContaining({ original_language: "fr" }), french: expect.anything() });
+      // 1 appel pour les détails + 1 appel pour les images (backdrops).
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy.mock.calls[0][0]).toBe("/movie/550");
+      expect(res).toEqual({ original: expect.objectContaining({ original_language: "fr" }), french: expect.anything(), backdrops: [] });
       expect(res.original).toBe(res.french);
     });
 
@@ -177,17 +179,21 @@ describe("TmdbSource", () => {
       const spy = jest
         .spyOn(source as any, "request")
         .mockResolvedValueOnce({ id: 550, original_language: "en" } as any)
-        .mockResolvedValueOnce({ id: 550, title: "Fight Club" } as any);
+        .mockResolvedValueOnce({ id: 550, title: "Fight Club" } as any)
+        .mockResolvedValueOnce({ backdrops: [] } as any);
 
       const res = await source.getMovieLocalized(550);
 
-      expect(spy).toHaveBeenCalledTimes(2);
+      // 2 appels pour les détails + 1 appel pour les images.
+      expect(spy).toHaveBeenCalledTimes(3);
       expect(spy.mock.calls[0][0]).toBe("/movie/550");
       expect(spy.mock.calls[0][1]).toEqual({ append_to_response: "credits", language: "fr" });
       expect(spy.mock.calls[1][0]).toBe("/movie/550");
       expect(spy.mock.calls[1][1]).toEqual({ append_to_response: "credits", language: "en" });
+      expect(spy.mock.calls[2][0]).toBe("/movie/550/images");
       expect(res.original).toEqual({ id: 550, title: "Fight Club" });
       expect(res.french).toEqual({ id: 550, original_language: "en" });
+      expect(res.backdrops).toEqual([]);
     });
 
     it("getShowLocalized utilise original_language de la série", async () => {
@@ -263,7 +269,10 @@ describe("TmdbSource", () => {
       });
       const res = await source.scrape({ type: "series" });
       expect(res.media).toHaveLength(1);
-      expect(res.media[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      // L'id est un uuid v4 aléatoire (unique à chaque exécution).
+      expect(res.media[0].id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      );
       expect(calls).toContain("/search/tv");
       expect(calls).toContain("/tv/1399");
     });
@@ -278,7 +287,10 @@ describe("TmdbSource", () => {
       });
       const res = await source.scrape({ type: "movie" });
       expect(res.media).toHaveLength(1);
-      expect(res.media[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      // L'id est un uuid v4 aléatoire (unique à chaque exécution).
+      expect(res.media[0].id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      );
       expect(calls).toContain("/search/movie");
       expect(calls).toContain("/movie/550");
     });
@@ -332,7 +344,9 @@ describe("TmdbSource", () => {
       expect(res.persons).toHaveLength(2);
       const brad = res.persons.find((p) => p.name === "Brad Pitt");
       expect(brad).toBeDefined();
-      expect(brad!.id).toBe("tmdb-287");
+      expect(brad!.id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      );
       expect(brad!.biography).toBe("Biographie de la personne");
       expect(brad!.birthday).toBe("1963-12-18");
       expect(brad!.gender).toBe(1);
@@ -364,7 +378,9 @@ describe("TmdbSource", () => {
       const res = await source.scrape({ type: "movie" });
       // Brad Pitt présent dans les deux films -> une seule personne.
       expect(res.persons).toHaveLength(1);
-      expect(res.persons[0].id).toBe("tmdb-287");
+      expect(res.persons[0].id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      );
     });
 
     it("limite le nombre de personnes récupérées par moissonnage", async () => {

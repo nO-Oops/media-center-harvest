@@ -17,8 +17,25 @@ export const INDEX_NAMES = {
 
 /** Paramètres de recherche de l'index `movies`. */
 export const MOVIES_SETTINGS = {
-  searchableAttributes: ["title", "title_fr", "overview", "overview_fr", "genres"],
-  filterableAttributes: ["type", "genres", "rating", "tmdb_id", "imdb_id"],
+  searchableAttributes: [
+    "title",
+    "title_fr",
+    "overview",
+    "overview_fr",
+    "genres",
+    // Distribution enrichie : recherche par nom d'acteur ou par personnage.
+    "cast.name",
+    "cast.character",
+  ],
+  filterableAttributes: [
+    "type",
+    "genres",
+    "rating",
+    "tmdb_id",
+    "imdb_id",
+    // Filtre par membre du casting (nom de l'acteur).
+    "cast.name",
+  ],
   sortableAttributes: ["year", "rating"],
 };
 

@@ -61,6 +61,7 @@ function fakeClient(opts: {
     .mockResolvedValue(fakeTask(opts.taskStatus ?? "succeeded", opts.indexedDocuments));
   const client = {
     index: (_uid: string) => fakeIndex(addDocuments),
+    createIndex: jest.fn(async () => ({ taskUid: 1 })),
     waitForTask,
   } as unknown as MeiliSearch;
   return { client, addDocuments, waitForTask };
@@ -78,12 +79,12 @@ function movie(id: string, indexName: MovieDocument["indexName"] = "movies"): Mo
     overview_fr: "",
     year: 2020,
     genres: ["Drame"],
+    posterUrls: [],
+    backdropUrls: [],
     cast: [],
     director: "",
     crew: [],
     rating: 0,
-    posterUrls: [],
-    backdropUrls: [],
     tmdb_id: null,
     imdb_id: null,
     spoken_languages: [],
@@ -175,6 +176,7 @@ describe("MeilisearchIndexer.ensureIndexes — configuration retryée des indexe
     const client = {
       index: (_uid: string) =>
         ({ uid: _uid, addDocuments: jest.fn().mockResolvedValue({ taskUid: 2 }), updateSettings }) as unknown as Index,
+      createIndex: jest.fn(async () => ({ taskUid: 1 })),
     } as unknown as MeiliSearch;
     const indexer = new MeilisearchIndexer(client);
 
@@ -182,8 +184,16 @@ describe("MeilisearchIndexer.ensureIndexes — configuration retryée des indexe
 
     expect(updateSettings).toHaveBeenCalledTimes(4);
     expect(updateSettings).toHaveBeenNthCalledWith(1, {
-      searchableAttributes: ["title", "title_fr", "overview", "overview_fr", "genres"],
-      filterableAttributes: ["type", "genres", "rating", "tmdb_id", "imdb_id"],
+      searchableAttributes: [
+        "title",
+        "title_fr",
+        "overview",
+        "overview_fr",
+        "genres",
+        "cast.name",
+        "cast.character",
+      ],
+      filterableAttributes: ["type", "genres", "rating", "tmdb_id", "imdb_id", "cast.name"],
       sortableAttributes: ["year", "rating"],
     });
   });
@@ -203,6 +213,7 @@ describe("MeilisearchIndexer.ensureIndexes — configuration retryée des indexe
     const client = {
       index: (_uid: string) =>
         ({ uid: _uid, addDocuments: jest.fn().mockResolvedValue({ taskUid: 2 }), updateSettings }) as unknown as Index,
+      createIndex: jest.fn(async () => ({ taskUid: 1 })),
     } as unknown as MeiliSearch;
     const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
     const indexer = new MeilisearchIndexer(client);
@@ -223,6 +234,7 @@ describe("MeilisearchIndexer.ensureIndexes — configuration retryée des indexe
     const client = {
       index: (_uid: string) =>
         ({ uid: _uid, addDocuments: jest.fn().mockResolvedValue({ taskUid: 2 }), updateSettings }) as unknown as Index,
+      createIndex: jest.fn(async () => ({ taskUid: 1 })),
     } as unknown as MeiliSearch;
     const indexer = new MeilisearchIndexer(client);
 
@@ -260,6 +272,7 @@ describe("MeilisearchIndexer.upsert — retry addDocuments (onRetry L.76)", () =
           uid: _uid,
           addDocuments,
           updateSettings: jest.fn(async () => ({ taskUid: 1 })),
+          createIndex: jest.fn(async () => ({ taskUid: 1 })),
         }) as unknown as Index,
       waitForTask: jest.fn().mockResolvedValue(fakeTask("succeeded")),
     } as unknown as MeiliSearch;
@@ -294,6 +307,7 @@ describe("MeilisearchIndexer — suppression de documents", () => {
           deleteDocument,
           deleteDocuments,
           search,
+          createIndex: jest.fn(async () => ({ taskUid: 1 })),
         }) as unknown as Index,
     } as unknown as MeiliSearch;
     return { client, deleteDocument, deleteDocuments, search };

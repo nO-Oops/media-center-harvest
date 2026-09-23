@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { Media, Person } from "../../models/media";
 import { MediaKind } from "../../models/harvest";
+import type { CastMember } from "../../models/documents";
 import { isValidVideoUrl } from "../../utils/video";
 import type {
   ActorCreditItem,
@@ -48,29 +49,83 @@ export function imageUrl(path: string | null | undefined, size = "w500"): string
   return `${IMAGE_BASE}/${size}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+/**
+ * Construit la liste des URLs de backdrops haute résolution (> 2000 px).
+ *
+ * Utilise la taille `original` (pleine résolution TMDB) pour chaque backdrop et
+ * en retient au plus `maxBackdrops` (5) différents. Les backdrops dont la largeur
+ * est inférieure ou égale à 2000 px sont filtrés afin de ne conserver que les
+ * versions véritablement haute résolution.
+ */
+export function extractBackdropUrls(
+  backdrops: ImageBackdrop[] | undefined,
+  maxBackdrops = 5
+): string[] {
+  if (!backdrops || backdrops.length === 0) {
+    return [];
+  }
+  const urls: string[] = [];
+  for (const backdrop of backdrops) {
+    if (!backdrop.file_path) {
+      continue;
+    }
+    // Ne conserver que les backdrops dont la largeur originale dépasse 2000 px.
+    if (backdrop.width && backdrop.width <= 2000) {
+      continue;
+    }
+    urls.push(imageUrl(backdrop.file_path, "original"));
+    if (urls.length >= maxBackdrops) {
+      break;
+    }
+  }
+  return urls;
+}
+
 /** Normalise une liste de genres TMDB vers des noms (français si connu). */
 function normalizeGenres(genres: Array<{ id: number; name: string }> | undefined): string[] {
   return (genres ?? []).map((g) => GENRE_FR[g.id] ?? g.name);
 }
 
-/** Extrait les noms d'acteurs à partir des crédits TMDB (triés par ordre). */
-function extractCast(credits: { cast?: unknown } | undefined): string[] {
+/** Extrait la distribution enrichie à partir des crédits TMDB (triée par ordre). */
+/**
+ * Chaque membre de cast reçoit un uuid v4 généré ici. Ces identifiants sont
+ * partagés avec l'index `persons` via `media.personIds` (voir mapTmdbMovie /
+ * mapTmdbShow) afin que l'`id` du cast corresponde à l'`id` de son document
+ * personne.
+ */
+function extractCast(credits: { cast?: unknown } | undefined): CastMember[] {
   const cast = (credits?.cast as Array<Record<string, unknown>>) ?? [];
   return cast
     .sort((a, b) => (Number(a.order) ?? 999) - (Number(b.order) ?? 999))
     .slice(0, 30)
-    .map((c) => String(c.name ?? ""))
-    .filter(Boolean);
+    .map((c) => ({
+      id: randomUUID(),
+      name: String(c.name ?? ""),
+      character: c.character ? String(c.character) : null,
+      profileUrl: imageUrl(String(c.profile_path ?? "")),
+      order: Number(c.order ?? 999),
+    }))
+    .filter((m) => m.name);
 }
 
-/** Extrait les noms de équipe (réalisateur, scénaristes…) des crédits TMDB. */
-function extractCrew(credits: { crew?: unknown } | undefined): string[] {
+/**
+ * Extrait l'ensemble de l'équipe technique des crédits TMDB (nom + poste).
+ *
+ * Tous les membres du crew sont conservés — réalisateur, scénaristes,
+ * producteurs, monteurs, chefs opérateurs… — afin que chacun soit indexé
+ * comme une personne à part entière dans l'index `persons`.
+ */
+function extractCrew(
+  credits: { crew?: unknown } | undefined
+): Array<{ name: string; job: string; id: string }> {
   const crew = (credits?.crew as Array<Record<string, unknown>>) ?? [];
-  const relevant = new Set(["Director", "Writer", "Screenplay", "Original Writer", "Dialogue"]);
   return crew
-    .filter((c) => relevant.has(String(c.job)))
-    .map((c) => String(c.name ?? ""))
-    .filter(Boolean);
+    .map((c) => ({
+      id: randomUUID(),
+      name: String(c.name ?? ""),
+      job: String(c.job ?? ""),
+    }))
+    .filter((c) => c.name);
 }
 
 /** Retourne l'année à partir d'une date ISO (release_date / air_date). */
@@ -88,6 +143,8 @@ function yearFromDate(date: unknown): number | undefined {
 export interface LocalizedMedia {
   original: TmdbResponse;
   french: TmdbResponse;
+  /** Backdrops haute résolution (> 2000 px) récupérés via l'endpoint `/images`. */
+  backdrops?: ImageBackdrop[];
 }
 
 /**
@@ -97,7 +154,7 @@ export interface LocalizedMedia {
  */
 function splitLocalization(
   data: TmdbResponse | LocalizedMedia
-): { original: TmdbResponse; french: TmdbResponse } {
+): { original: TmdbResponse; french: TmdbResponse; backdrops?: ImageBackdrop[] } {
   if (
     data &&
     typeof data === "object" &&
@@ -105,7 +162,7 @@ function splitLocalization(
     "french" in data
   ) {
     const loc = data as LocalizedMedia;
-    return { original: loc.original ?? {}, french: loc.french ?? {} };
+    return { original: loc.original ?? {}, french: loc.french ?? {}, backdrops: loc.backdrops };
   }
   return { original: data as TmdbResponse, french: data as TmdbResponse };
 }
@@ -114,9 +171,22 @@ function splitLocalization(
 export function mapTmdbMovie(
   data: TmdbResponse | LocalizedMedia
 ): Media {
-  const { original, french } = splitLocalization(data);
+  const { original, french, backdrops } = splitLocalization(data);
   const credits = (original.credits as { cast?: unknown; crew?: unknown } | undefined) ?? {};
-  const directorNames = extractCrew(credits);
+  const crew = extractCrew(credits);
+  const director =
+    crew.find((c) => c.job.trim().toLowerCase().includes("director"))?.name;
+
+  const tmdbId = typeof original.id === "number" ? original.id : undefined;
+  const imdbId = typeof original.imdb_id === "string" ? original.imdb_id : undefined;
+
+  // UUID v4 unique par personne, partagé entre le cast et les documents
+  // de l'index `persons` (voir `personsFromMedia`).
+  const cast = extractCast(credits);
+  const personIds = new Map<string, string>();
+  for (const member of cast) {
+    personIds.set(member.name.trim().toLowerCase(), member.id);
+  }
 
   return {
     id: randomUUID(),
@@ -127,12 +197,13 @@ export function mapTmdbMovie(
     overview_fr: french.overview ? String(french.overview) : undefined,
     year: yearFromDate(original.release_date),
     genres: normalizeGenres(original.genres as never),
-    cast: extractCast(credits),
-    director: directorNames[0],
-    crew: extractCrew(credits),
+    cast,
+    personIds,
+    director,
+    crew,
     rating: typeof original.vote_average === "number" ? original.vote_average : 0,
     posterUrls: [imageUrl(original.poster_path as string)].filter(Boolean),
-    backdropUrls: [imageUrl(original.backdrop_path as string, "w1280")].filter(Boolean),
+    backdropUrls: extractBackdropUrls(backdrops),
     tmdbId: typeof original.id === "number" ? original.id : undefined,
     imdbId: typeof original.imdb_id === "string" ? original.imdb_id : undefined,
     spokenLanguages: ((original.spoken_languages as Array<{ iso_639_1: string }>) ?? [])
@@ -145,9 +216,22 @@ export function mapTmdbMovie(
 
 /** Construit un Media à partir d'une réponse TMDB (série TV). */
 export function mapTmdbShow(data: TmdbResponse | LocalizedMedia): Media {
-  const { original, french } = splitLocalization(data);
+  const { original, french, backdrops } = splitLocalization(data);
   const credits = (original.credits as { cast?: unknown; crew?: unknown } | undefined) ?? {};
-  const directorNames = extractCrew(credits);
+  const crew = extractCrew(credits);
+  const director =
+    crew.find((c) => c.job.trim().toLowerCase().includes("director"))?.name;
+
+  const tmdbId = typeof original.id === "number" ? original.id : undefined;
+  const imdbId = typeof original.imdb_id === "string" ? original.imdb_id : undefined;
+
+  // UUID v4 unique par personne, partagé entre le cast et les documents
+  // de l'index `persons` (voir `personsFromMedia`).
+  const cast = extractCast(credits);
+  const personIds = new Map<string, string>();
+  for (const member of cast) {
+    personIds.set(member.name.trim().toLowerCase(), member.id);
+  }
 
   return {
     id: randomUUID(),
@@ -158,12 +242,13 @@ export function mapTmdbShow(data: TmdbResponse | LocalizedMedia): Media {
     overview_fr: french.overview ? String(french.overview) : undefined,
     year: yearFromDate(original.first_air_date),
     genres: normalizeGenres(original.genres as never),
-    cast: extractCast(credits),
-    director: directorNames[0],
-    crew: extractCrew(credits),
+    cast,
+    personIds,
+    director,
+    crew,
     rating: typeof original.vote_average === "number" ? original.vote_average : 0,
     posterUrls: [imageUrl(original.poster_path as string)].filter(Boolean),
-    backdropUrls: [imageUrl(original.backdrop_path as string, "w1280")].filter(Boolean),
+    backdropUrls: extractBackdropUrls(backdrops),
     tmdbId: typeof original.id === "number" ? original.id : undefined,
     spokenLanguages: ((original.spoken_languages as Array<{ iso_639_1: string }>) ?? [])
       .map((l) => l.iso_639_1)
@@ -199,15 +284,11 @@ export function mapTmdbPerson(data: Record<string, unknown>): Person {
   const knownForDepartment =
     typeof data.known_for_department === "string" ? data.known_for_department : null;
 
-  // Identifiant stable `tmdb-<id>` utilisé comme **clé de document Meilisearch**.
-  // Le séparateur est un tiret (et non un deux-points) : Meilisearch n'accepte
-  // que des identifiants composés de caractères alphanumériques, tirets (-) et
-  // underscores (_). Un deux-points rendrait le document invalide et ferait
-  // échouer l'indexation par lot entière (Meilisearch valide le batch atomique),
-  // ce qui expliquerait qu'aucune personne ne soit indexée. Ce préfixe reste
-  // cohérent avec la clé de déduplication des médias (tmdb:<id>) dans
-  // l'orchestrateur. En fallback (id manquant), on retombe sur un uuid aléatoire.
-  const id = typeof data.id === "number" ? `tmdb-${data.id}` : randomUUID();
+  // Identifiant interne aléatoire (uuid v4) : Meilisearch l'utilise comme clé
+  // de document pour les upserts. La déduplication inter-exécutions des médias
+  // s'appuie sur la clé stable `tmdb:<id>` / `imdb:<id>` dans l'orchestrateur
+  // (`dedupKey`), et non sur cet identifiant interne.
+  const id = randomUUID();
 
   return {
     id,

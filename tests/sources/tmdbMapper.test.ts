@@ -51,14 +51,21 @@ describe("tmdbMapper", () => {
     it("normalise un film avec genre français et cast trié", () => {
       const media = mapTmdbMovie(data);
       expect(media.kind).toBe(MediaKind.MOVIE);
-      expect(media.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      // L'id est un uuid v4 aléatoire : unique à chaque exécution.
+      expect(media.id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      );
       expect(media.title).toBe("Fight Club");
       expect(media.year).toBe(1999);
       expect(media.genres).toEqual(["Drame"]);
       expect(media.rating).toBe(8.4);
       expect(media.runtime).toBe(139);
-      // cast trié par ordre : Edward Norton d'abord
-      expect(media.cast[0]).toBe("Edward Norton");
+      // cast trié par ordre : Edward Norton d'abord, enrichi des champs TMDB
+      expect(media.cast[0].name).toBe("Edward Norton");
+      expect(media.cast[0].order).toBe(0);
+      expect(media.cast[0].character).toBeNull();
+      expect(media.cast[0].profileUrl).toBe("");
+      expect(media.cast[1].name).toBe("Brad Pitt");
       expect(media.director).toBe("David Fincher");
       expect(media.tmdbId).toBe(550);
       expect(media.imdbId).toBe("tt0137523");
@@ -242,7 +249,9 @@ describe("tmdbMapper", () => {
         biography: "Acteur.",
         profile_path: "/p.jpg",
       });
-      expect(person.id).toBe("tmdb-287");
+      expect(person.id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      );
       expect(person.name).toBe("Brad Pitt");
       expect(person.biography).toBe("Acteur.");
       expect(person.profileUrl).toContain("w300/p.jpg");

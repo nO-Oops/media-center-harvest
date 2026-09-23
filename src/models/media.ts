@@ -1,4 +1,5 @@
 import { HarvestSource, MediaKind } from "./harvest";
+import type { CastMember } from "./documents";
 
 /**
  * Un épisode d'une série TV.
@@ -77,12 +78,12 @@ export interface Media {
   year?: number;
   /** Liste des genres. */
   genres: string[];
-  /** Liste des acteurs. */
-  cast: string[];
+  /** Distribution enrichie (acteurs + rôle + profil). */
+  cast: CastMember[];
   /** Réalisateur (film / documentaire). */
   director?: string;
-  /** Liste des membres de l'équipe. */
-  crew: string[];
+  /** Liste des membres de l'équipe technique (nom + poste). */
+  crew: Array<{ name: string; job: string; id: string }>;
   /** Note / moyenne des votes (0 - 10). */
   rating: number;
   /** Liste des URLs de l'affiche / poster. */
@@ -115,6 +116,13 @@ export interface Media {
   keywords?: string[];
   /** Source ayant fourni la donnée la plus récente. */
   source?: HarvestSourceLike;
+  /**
+   * UUID v4 des documents personnes liés (clé : nom de la personne en minuscule).
+   * Générés une seule fois lors du mappeur TMDB et réutilisés à l'indexation
+   * pour que l'`id` d'un membre du cast corresponde à l'`id` de son document
+   * dans l'index `persons`.
+   */
+  personIds?: Map<string, string>;
 }
 
 /** Alias souple pour éviter une dépend cyclique à l'import. */

@@ -25,16 +25,16 @@ Toutes les données récupérées doivent être normalisées et indexées dans M
 
 ```typescript
 interface MovieDocument {
-  id: string;                  // ID interne ou externe (ex: imdbId, tmdbId)
+  id: string;                  // uuid v4
   title: string;               // Titre principal
   title_fr: string;            // Titre principal en français
   overview: string;            // Synopsis
   overview_fr: string;         // Synopsis en français
   year: number;                // Date de sortie au format ISO 8601 ou null
   genres: string[];            // Liste des Genres
-  cast: string[];              // Liste des acteurs
+  cast: string[];              // Liste des acteurs avec informations complémentaires (id, nom, role, image, position)
   director: string;            // Réalisateur (pour les films/doc)
-  crew: string[];              // Liste des équipes
+  crew: string[];              // Liste des équipes avec informations complémentaires (id, nom, role, image, position)
   rating: number;              // Note
   posterUrl: string[];         // Liste des URLs de l'affiche/poster
   backdropUrls: string[];      // Liste des URLs des fonds d'écran
@@ -46,7 +46,7 @@ interface MovieDocument {
 }
 
 interface PersonDocument {
-  id: string;                  // ID de la personne
+  id: string;                  // uuid v4
   name: string;                // Nom complet
   type: 'actor' | 'director' | 'creator' | 'writer' | 'other';
   biography: string;           // Biographie courte ou lien vers la bio

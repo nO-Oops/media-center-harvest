@@ -119,8 +119,11 @@ describe("meilisearch mappers", () => {
       media.id = "movie-1";
       media.title = "Movie";
       media.director = "Nolan";
-      media.cast = ["DiCaprio", "Bale"];
-      media.crew = ["Zanuck"];
+      media.cast = [
+        { id: "1", name: "DiCaprio", character: null, profileUrl: "", order: 0 },
+        { id: "2", name: "Bale", character: null, profileUrl: "", order: 1 },
+      ];
+      media.crew = [{ id: "crew-zanuck", name: "Zanuck", job: "Screenplay" }];
 
       const persons = personsFromMedia(media);
 
@@ -142,8 +145,8 @@ describe("meilisearch mappers", () => {
       const media = emptyMedia(MediaKind.SERIES);
       media.id = "show-1";
       media.director = "Villeneuve";
-      media.cast = ["Lupita"];
-      media.crew = ["Gruenwald"];
+      media.cast = [{ id: "3", name: "Lupita", character: null, profileUrl: "", order: 0 }];
+      media.crew = [{ id: "crew-gruenwald", name: "Gruenwald", job: "Writer" }];
 
       const persons = personsFromMedia(media);
       expect(persons).toHaveLength(3);
@@ -154,21 +157,46 @@ describe("meilisearch mappers", () => {
       expect(byName["Gruenwald"]).toBe("writer");
     });
 
-    it("génère des ids uuid v4 uniques", () => {
+    it("attribue un type de personne à chaque membre de l'équipe selon son poste", () => {
       const media = emptyMedia(MediaKind.MOVIE);
       media.id = "movie-1";
       media.director = "Nolan";
-      media.cast = ["DiCaprio"];
+      media.cast = [{ id: "1", name: "DiCaprio", character: null, profileUrl: "", order: 0 }];
+      media.crew = [
+        { id: "crew-zanuck", name: "Zanuck", job: "Producer" },
+        { id: "crew-uhls", name: "Uhls", job: "Screenplay" },
+        { id: "crew-nolan", name: "Nolan", job: "Director" }, // doublon avec le réalisateur -> exclu
+        { id: "crew-prystiner", name: "Prystiner", job: "Editor" },
+      ];
 
       const persons = personsFromMedia(media);
-      const uuidV4Regex =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+      const byName = Object.fromEntries(persons.map((p) => [p.name, p.type]));
+      expect(byName["DiCaprio"]).toBe("actor");
+      expect(byName["Nolan"]).toBe("director");
+      expect(byName["Zanuck"]).toBe("creator");
+      expect(byName["Uhls"]).toBe("writer");
+      expect(byName["Prystiner"]).toBe("other");
+      // Le réalisateur n'apparaît qu'une seule fois (pas de doublon crew/director).
+      expect(persons.filter((p) => p.name === "Nolan").length).toBe(1);
+    });
+
+    it("génère des ids uuid v4 uniques au sein d'un même média", () => {
+      const media = emptyMedia(MediaKind.MOVIE);
+      media.id = "movie-1";
+      media.director = "Nolan";
+      media.cast = [{ id: "1", name: "DiCaprio", character: null, profileUrl: "", order: 0 }];
+
+      const persons = personsFromMedia(media);
+
+      // Les ids sont des uuid v4 valides.
+      const uuidRe =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       for (const p of persons) {
-        expect(p.id).toMatch(uuidV4Regex);
+        expect(p.id).toMatch(uuidRe);
       }
 
-      // Les ids sont uniques au sein d'un même média.
+      // Les ids sont uniques au sein d'un même média (dédoublonnage par nom+rôle).
       expect(new Set(persons.map((p) => p.id)).size).toBe(persons.length);
     });
 

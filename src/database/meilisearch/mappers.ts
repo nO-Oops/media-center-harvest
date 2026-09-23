@@ -19,12 +19,12 @@ export function mediaToMovieDocument(media: Media): MovieDocument {
     overview_fr: media.overview_fr ?? "",
     year: media.year ?? null,
     genres: media.genres,
+    posterUrls: media.posterUrls,
+    backdropUrls: media.backdropUrls,
     cast: media.cast,
     director: media.director ?? "",
     crew: media.crew,
     rating: media.rating,
-    posterUrls: media.posterUrls,
-    backdropUrls: media.backdropUrls,
     tmdb_id: media.tmdbId ?? null,
     imdb_id: media.imdbId ?? null,
     spoken_languages: media.spokenLanguages,
@@ -76,24 +76,31 @@ export function episodeToDocument(episode: Episode): EpisodeDocument {
  * Utilisée à l'indexation pour créer automatiquement les documents de l'index
  * `persons` (acteurs, réalisateur, équipe) associés à chaque média.
  *
- * Les identifiants sont des **uuid v4** aléatoires : une même personne liée au
- * même média produira un `id` différent à chaque exécution, garantissant
- * l'unicité des documents de l'index `persons`.
+ * Les identifiants sont des **uuid v4** : Meilisearch utilise `id` pour les
+ * upserts. Pour un média issu de TMDB, l'uuid est généré une seule fois par le
+ * mappeur et partagé entre le membre de cast et son document de l'index
+ * `persons` (via `media.personIds`). L'unicité au sein d'une exécution est
+ * garantie par le dédoublonnage par nom+rôle (`seen`) ; la déduplication
+ * inter-exécutions repose sur d'autres mécanismes (clé stable dans l'orchestrateur
+ * pour les médias, agrégation par nom+rôle dans `mergePersons` pour les personnes).
  */
 export function personsFromMedia(media: Media): Person[] {
   const mediaId = media.id;
   const persons: Person[] = [];
   const seen = new Set<string>();
 
-  const add = (name: string, type: Person["type"]): void => {
+  const add = (name: string, type: Person["type"], id?: string): void => {
     const clean = name.trim();
     if (!clean || seen.has(clean)) {
       return;
     }
     seen.add(clean);
-    const id = randomUUID();
+    // Réutilise l'uuid v4 généré par le mappeur TMDB quand il est disponible,
+    // afin que l'`id` du membre de cast corresponde à l'`id` de son document
+    // dans l'index `persons`. Sinon, on génère un uuid v4 aléatoire.
+    const personId = id ?? randomUUID();
     persons.push({
-      id,
+      id: personId,
       name: clean,
       type,
       biography: "",
@@ -102,23 +109,52 @@ export function personsFromMedia(media: Media): Person[] {
     });
   };
 
-  // Acteurs (cast).
-  for (const name of media.cast) {
-    add(name, "actor");
+  // Acteurs (cast) : réutilisation des uuid v4 partagés via `media.personIds`.
+  for (const member of media.cast) {
+    const key = member.name.trim().toLowerCase();
+    add(member.name, "actor", media.personIds?.get(key));
   }
   // Réalisateur (film / documentaire / série).
   if (media.director) {
     add(media.director, "director");
   }
-  // Équipe technique (réalisateur exclu, déjà traité : scénaristes, producteur…).
-  for (const name of media.crew) {
-    if (name.trim() === media.director?.trim()) {
+  // Équipe technique : chaque membre est indexé comme une personne à part
+  // entière, avec un type déduit de son poste (scénariste, producteur…).
+  // Le réalisateur est exclu ici car déjà traité ci-dessus.
+  for (const { name, job, id } of media.crew) {
+    const clean = name.trim();
+    if (!clean || clean.toLowerCase() === media.director?.trim().toLowerCase()) {
       continue;
     }
-    add(name, "writer");
+    add(clean, crewJobToType(job), id);
   }
 
   return persons;
+}
+
+/**
+ * Dédit le type de personne d'un poste technique TMDB.
+ *
+ * - « Director » → director
+ * - « Writer / Screenplay / Original Writer / Dialogue / Story » → writer
+ * - « Producer » (et variantes) → creator
+ * - tout autre poste → other
+ */
+function crewJobToType(job: string): Person["type"] {
+  const j = job.trim().toLowerCase();
+  if (j.includes("director")) return "director";
+  if (
+    j.includes("writer") ||
+    j.includes("screenplay") ||
+    j.includes("dialogue") ||
+    j.includes("story")
+  ) {
+    return "writer";
+  }
+  if (j.includes("producer")) {
+    return "creator";
+  }
+  return "other";
 }
 
 /** Convertit une Person vers une PersonDocument. */

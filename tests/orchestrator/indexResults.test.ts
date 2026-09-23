@@ -42,8 +42,11 @@ describe("indexResults", () => {
     const media = emptyMedia(MediaKind.MOVIE);
     media.id = "movie-1";
     media.director = "Nolan";
-    media.cast = ["DiCaprio", "Hardy"];
-    media.crew = ["Gruenwald"];
+    media.cast = [
+      { id: "1", name: "DiCaprio", character: null, profileUrl: "", order: 0 },
+      { id: "2", name: "Hardy", character: null, profileUrl: "", order: 1 },
+    ];
+    media.crew = [{ id: "crew-gruenwald", name: "Gruenwald", job: "Writer" }];
     result.media.push(media);
 
     await indexResults(result, indexer);
@@ -65,13 +68,44 @@ describe("indexResults", () => {
     }
   });
 
+  it("correspond l'id d'un membre du cast à l'id de son document personne", async () => {
+    const indexer = mockIndexer();
+    const result = emptyResult();
+    const media = emptyMedia(MediaKind.MOVIE);
+    media.id = "movie-1";
+    media.director = "Nolan";
+    media.cast = [
+      { id: "uuid-dicaprio", name: "DiCaprio", character: null, profileUrl: "", order: 0 },
+      { id: "uuid-hardy", name: "Hardy", character: null, profileUrl: "", order: 1 },
+    ];
+    // UUIDs partagés entre le cast et les documents personnes (générés par le
+    // mappeur TMDB, réutilisés par personsFromMedia).
+    media.personIds = new Map([
+      ["dicaprio", "uuid-dicaprio"],
+      ["hardy", "uuid-hardy"],
+    ]);
+    result.media.push(media);
+
+    await indexResults(result, indexer);
+
+    const persons = indexer.submitted.filter(
+      (d: any) => d.indexName === "persons"
+    ) as any[];
+
+    // Chaque membre du cast doit avoir un document personne avec le même id.
+    const personIds = new Set(persons.map((p: any) => p.id));
+    for (const member of media.cast) {
+      expect(personIds.has(member.id)).toBe(true);
+    }
+  });
+
   it("crée les documents persons pour une série (showtv)", async () => {
     const indexer = mockIndexer();
     const result = emptyResult();
     const media = emptyMedia(MediaKind.SERIES);
     media.id = "show-1";
     media.director = "Villeneuve";
-    media.cast = ["Lupita"];
+    media.cast = [{ id: "3", name: "Lupita", character: null, profileUrl: "", order: 0 }];
     result.media.push(media);
 
     await indexResults(result, indexer);
@@ -91,7 +125,7 @@ describe("indexResults", () => {
     const media = emptyMedia(MediaKind.MOVIE);
     media.id = "movie-1";
     media.director = "Nolan";
-    media.cast = ["DiCaprio"];
+    media.cast = [{ id: "1", name: "DiCaprio", character: null, profileUrl: "", order: 0 }];
     result.media.push(media);
 
     // Personne de source (TMDB) portant le même nom+rôle qu'une personne
@@ -194,5 +228,35 @@ describe("indexResults", () => {
     appendError(result, "source down");
     const indexResult = await indexResults(result, indexer);
     expect(indexResult.errors).toEqual([]);
+  });
+
+  it("produit des ids uuid v4 valides et uniques par indexation", async () => {
+    const indexer = mockIndexer();
+    const result = emptyResult();
+    const media = emptyMedia(MediaKind.MOVIE);
+    media.id = "movie-1";
+    media.tmdbId = 550;
+    media.director = "Nolan";
+    media.cast = [{ id: "1", name: "DiCaprio", character: null, profileUrl: "", order: 0 }];
+    result.media.push(media);
+
+    await indexResults(result, indexer);
+    const docs = indexer.submitted as any[];
+
+    // Le document média conserve son id interne stable.
+    const movieDoc = docs.find((d) => d.indexName === "movies");
+    expect(movieDoc?.id).toBe("movie-1");
+
+    // Les documents personnes sont des uuid v4 valides.
+    const uuidRe =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const personDocs = docs.filter((d) => d.indexName === "persons");
+    for (const p of personDocs) {
+      expect(p.id).toMatch(uuidRe);
+    }
+
+    // Les ids sont uniques au sein d'une même indexation.
+    const uniqueIds = new Set(docs.map((d) => d.id));
+    expect(uniqueIds.size).toBe(docs.length);
   });
 });

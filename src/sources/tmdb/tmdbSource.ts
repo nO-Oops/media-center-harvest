@@ -22,6 +22,7 @@ import {
 } from "./tmdbMapper";
 import type {
   ActorCreditsResult,
+  ImageBackdrop,
   CastAndCrewResult,
   EpisodeResult,
   MovieResult,
@@ -200,13 +201,15 @@ export class TmdbSource implements MediaSource {
     });
     const originalLanguage = (french.original_language as string) ?? "en";
     if (originalLanguage === "fr") {
-      return { original: french, french };
+      const backdrops = await this.getImages(id, "movie");
+      return { original: french, french, backdrops };
     }
     const original = await this.request(`/movie/${id}`, {
       append_to_response: "credits",
       language: originalLanguage,
     });
-    return { original, french };
+    const backdrops = await this.getImages(id, "movie");
+    return { original, french, backdrops };
   }
 
   /** Récupère une série avec ses deux versions linguistiques. */
@@ -217,13 +220,15 @@ export class TmdbSource implements MediaSource {
     });
     const originalLanguage = (french.original_language as string) ?? "en";
     if (originalLanguage === "fr") {
-      return { original: french, french };
+      const backdrops = await this.getImages(id, "tv");
+      return { original: french, french, backdrops };
     }
     const original = await this.request(`/tv/${id}`, {
       append_to_response: "credits",
       language: originalLanguage,
     });
-    return { original, french };
+    const backdrops = await this.getImages(id, "tv");
+    return { original, french, backdrops };
   }
 
   /** Récupère une personne par son ID TMDB. */
@@ -335,6 +340,24 @@ export class TmdbSource implements MediaSource {
     } catch (error) {
       logger.debug(`TMDB find échoué pour ${externalId}: ${(error as Error).message}`);
       return null;
+    }
+  }
+
+  /**
+   * Récupère les images (backdrops / posters) d'un film ou d'une série.
+   *
+   * L'endpoint `/images` renvoie l'ensemble des backdrops disponibles pour un
+   * média. Chaque backdrop conserve ses dimensions (`width` / `height`) afin de
+   * pouvoir sélectionner les versions haute résolution (> 2000 px).
+   */
+  async getImages(id: number, mediaType: "movie" | "tv"): Promise<ImageBackdrop[]> {
+    try {
+      const data = await this.request(`/${mediaType === "movie" ? "movie" : "tv"}/${id}/images`, {});
+      const backdrops = (data.backdrops as ImageBackdrop[]) ?? [];
+      return backdrops.filter((b) => b.file_path);
+    } catch (error) {
+      logger.debug(`TMDB images échoué pour ${id} (${mediaType}) : ${(error as Error).message}`);
+      return [];
     }
   }
 

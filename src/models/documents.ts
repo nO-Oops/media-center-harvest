@@ -1,6 +1,45 @@
 import { MediaKind } from "./harvest";
 
 /**
+ * Membre du casting d'un média, enrichi à partir des crédits TMDB.
+ *
+ * Chaque acteur est documenté par son identifiant TMDB, son nom, le rôle
+ * (personnage) qu'il interprète, une URL de profil et son rang dans le
+ * casting (0 = premier plan).
+ */
+export interface CastMember {
+  /**
+   * Identifiant interne (uuid v4) du document personne associé.
+   * Généré une seule fois et partagé avec l'index `persons` pour permettre le
+   * lien entre un membre du cast et sa personne.
+   */
+  id: string;
+  /** Nom complet. */
+  name: string;
+  /** Rôle / personnage interprété (null si absent). */
+  character: string | null;
+  /** URL du profil (image TMDB) ou chaîne vide. */
+  profileUrl: string;
+  /** Rang dans le casting (0 = premier plan). */
+  order: number;
+}
+
+/**
+ * Membre de l'équipe technique d'un média, enrichi à partir des crédits TMDB.
+ *
+ * Chaque membre est documenté par son nom complet et le poste (job) qu'il
+ * occupe sur la production (réalisateur, scénariste, producteur…).
+ */
+export interface CrewMember {
+  /** Identifiant interne (uuid v4) du document personne associé. */
+  id: string;
+  /** Nom complet. */
+  name: string;
+  /** Poste occupé sur la production (ex: « Director », « Screenplay »). */
+  job: string;
+}
+
+/**
  * Document filmé dans l'index Meilisearch `movies`.
  *
  * Le champ `id` est toujours présent et unique : Meilisearch l'utilise pour
@@ -25,18 +64,18 @@ export interface MovieDocument {
   year: number | null;
   /** Liste des genres. */
   genres: string[];
-  /** Liste des acteurs. */
-  cast: string[];
-  /** Réalisateur (film / documentaire). */
-  director: string;
-  /** Liste des membres de l'équipe. */
-  crew: string[];
-  /** Note / moyenne des votes (0 - 10). */
-  rating: number;
   /** Liste des URLs de l'affiche / poster. */
   posterUrls: string[];
   /** Liste des URLs des fonds d'écran. */
   backdropUrls: string[];
+  /** Distribution enrichie (acteurs + rôle + profil). */
+  cast: CastMember[];
+  /** Réalisateur (film / documentaire). */
+  director: string;
+  /** Liste des membres de l'équipe technique (nom + poste). */
+  crew: CrewMember[];
+  /** Note / moyenne des votes (0 - 10). */
+  rating: number;
   /** Identifiant TMDB. */
   tmdb_id: number | null;
   /** Identifiant IMDB (ex: "tt0000000"). */

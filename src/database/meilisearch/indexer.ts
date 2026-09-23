@@ -28,8 +28,33 @@ export class MeilisearchIndexer {
     };
   }
 
+  /**
+   * Crée les indexes avec une clé primaire explicite (`id`).
+   *
+   * Sans spécification explicite, Meilisearch infère la clé primaire en cherchant
+   * les champs se terminant par `id` / `Id` / `_id`. Or les documents `movies`
+   * possèdent trois champs concernés (`id`, `tmdb_id`, `imdb_id`) : l'inférence
+   * échoue alors. On crée donc chaque index avec `primaryKey: "id"` avant
+   * d'appliquer les paramètres de recherche.
+   */
+  private async createIndexesWithPrimaryKey(): Promise<void> {
+    for (const name of Object.values(INDEX_NAMES)) {
+      try {
+        await this.client.createIndex(name, { primaryKey: "id" });
+        logger.debug(`Index "${name}" créé avec la clé primaire "id"`);
+      } catch (error) {
+        // L'index existe déjà : l'erreur est ignorée (création idempotente).
+        const code = (error as { cause?: { code?: string } }).cause?.code;
+        if (code !== "index_already_exists") {
+          throw error;
+        }
+      }
+    }
+  }
+
   /** Crée (ou met à jour) les quatre indexes avec leurs paramètres. */
   async ensureIndexes(): Promise<void> {
+    await this.createIndexesWithPrimaryKey();
     await retryWithBackoff(() => ensureAllIndexes(this.indexes), {
       onRetry: ({ attempt, delay }) =>
         logger.warn(`Configuration Meilisearch - tentative ${attempt} dans ${delay}ms`),
