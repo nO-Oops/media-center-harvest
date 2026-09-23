@@ -196,7 +196,7 @@ export class TmdbSource implements MediaSource {
    */
   async getMovieLocalized(id: number): Promise<LocalizedMedia> {
     const french = await this.request(`/movie/${id}`, {
-      append_to_response: "credits",
+      append_to_response: "credits,videos",
       language: "fr",
     });
     const originalLanguage = (french.original_language as string) ?? "en";
@@ -205,7 +205,7 @@ export class TmdbSource implements MediaSource {
       return { original: french, french, backdrops };
     }
     const original = await this.request(`/movie/${id}`, {
-      append_to_response: "credits",
+      append_to_response: "credits,videos",
       language: originalLanguage,
     });
     const backdrops = await this.getImages(id, "movie");
@@ -215,7 +215,7 @@ export class TmdbSource implements MediaSource {
   /** Récupère une série avec ses deux versions linguistiques. */
   async getShowLocalized(id: number): Promise<LocalizedMedia> {
     const french = await this.request(`/tv/${id}`, {
-      append_to_response: "credits",
+      append_to_response: "credits,videos",
       language: "fr",
     });
     const originalLanguage = (french.original_language as string) ?? "en";
@@ -224,7 +224,7 @@ export class TmdbSource implements MediaSource {
       return { original: french, french, backdrops };
     }
     const original = await this.request(`/tv/${id}`, {
-      append_to_response: "credits",
+      append_to_response: "credits,videos",
       language: originalLanguage,
     });
     const backdrops = await this.getImages(id, "tv");

@@ -40,6 +40,19 @@ export interface CrewMember {
 }
 
 /**
+ * Une bande-annonce d'un média.
+ *
+ * Le champ `language` (code ISO 639-1, ex: « en », « fr ») permet de filtrer
+ * ou trier les bandes-annonces par langue dans Meilisearch.
+ */
+export interface Trailer {
+  /** URL de la bande-annonce (YouTube ou flux direct). */
+  url: string;
+  /** Code langue ISO 639-1 de la bande-annonce (ex: « en », « fr »). */
+  language: string;
+}
+
+/**
  * Document filmé dans l'index Meilisearch `movies`.
  *
  * Le champ `id` est toujours présent et unique : Meilisearch l'utilise pour
@@ -84,6 +97,8 @@ export interface MovieDocument {
   spoken_languages: string[];
   /** Durée en minutes (null si inconnue). */
   runtime: number | null;
+  /** Bandes-annonces de type « Trailer » en langue d'origine et en français. */
+  trailers: Trailer[];
   /** Liens des vidéos moissonnées. */
   video_links: string[];
 }

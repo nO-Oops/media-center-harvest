@@ -89,6 +89,7 @@ function movie(id: string, indexName: MovieDocument["indexName"] = "movies"): Mo
     imdb_id: null,
     spoken_languages: [],
     runtime: null,
+    trailers: [],
     video_links: [],
   };
 }
@@ -193,7 +194,15 @@ describe("MeilisearchIndexer.ensureIndexes — configuration retryée des indexe
         "cast.name",
         "cast.character",
       ],
-      filterableAttributes: ["type", "genres", "rating", "tmdb_id", "imdb_id", "cast.name"],
+      filterableAttributes: [
+        "type",
+        "genres",
+        "rating",
+        "tmdb_id",
+        "imdb_id",
+        "cast.name",
+        "trailers.language",
+      ],
       sortableAttributes: ["year", "rating"],
     });
   });

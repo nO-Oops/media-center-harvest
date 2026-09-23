@@ -29,6 +29,7 @@ export function mediaToMovieDocument(media: Media): MovieDocument {
     imdb_id: media.imdbId ?? null,
     spoken_languages: media.spokenLanguages,
     runtime: media.runtime ?? null,
+    trailers: media.trailers,
     video_links: media.videoLinks,
   };
 }

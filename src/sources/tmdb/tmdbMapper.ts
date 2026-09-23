@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { Media, Person } from "../../models/media";
 import { MediaKind } from "../../models/harvest";
-import type { CastMember } from "../../models/documents";
+import type { CastMember, Trailer } from "../../models/documents";
 import { isValidVideoUrl } from "../../utils/video";
 import type {
   ActorCreditItem,
@@ -210,6 +210,7 @@ export function mapTmdbMovie(
       .map((l) => l.iso_639_1)
       .filter(Boolean),
     runtime: typeof original.runtime === "number" ? original.runtime : undefined,
+    trailers: extractTrailers(original, french),
     videoLinks: extractVideoUrls(original),
   };
 }
@@ -254,6 +255,7 @@ export function mapTmdbShow(data: TmdbResponse | LocalizedMedia): Media {
       .map((l) => l.iso_639_1)
       .filter(Boolean),
     runtime: typeof original.runtime === "number" ? original.runtime : undefined,
+    trailers: extractTrailers(original, french),
     videoLinks: extractVideoUrls(original),
   };
 }
@@ -332,6 +334,61 @@ function extractVideoUrls(data: Record<string, unknown>): string[] {
     }
   }
   return urls;
+}
+
+/**
+ * Construit l'URL d'une bande-annonce TMDB.
+ *
+ * Les trailers YouTube sont reconstruits en `https://www.youtube.com/watch?v={key}` ;
+ * les autres sites (flux directs) sont validés via `isValidVideoUrl`.
+ */
+function buildTrailerUrl(video: Record<string, unknown>): string | null {
+  const site = String(video.site ?? "").toLowerCase();
+  const key = String(video.key ?? "");
+  if (!key) {
+    return null;
+  }
+  if (site === "youtube") {
+    return `https://www.youtube.com/watch?v=${key}`;
+  }
+  if (isValidVideoUrl(key)) {
+    return key;
+  }
+  return null;
+}
+
+/**
+ * Extrait les bandes-annonces d'un média depuis ses versions linguistiques.
+ *
+ * Seules les vidéos de type « Trailer » sont conservées (pas les teasers,
+ * featurettes ni clips). Chaque bande-annonce est associée à sa langue via le
+ * champ TMDB `iso_639_1`. L'ordre est : trailers en langue d'origine, puis
+ * trailers en français.
+ */
+function extractTrailers(
+  original: Record<string, unknown>,
+  french: Record<string, unknown>
+): Trailer[] {
+  const results: Trailer[] = [];
+
+  for (const source of [original, french]) {
+    const videos = (source.videos as { results?: Array<Record<string, unknown>> } | undefined)
+      ?.results;
+    for (const v of videos ?? []) {
+      // Ne conserver que les bandes-annonces de type « Trailer ».
+      if (String(v.type ?? "").toLowerCase() !== "trailer") {
+        continue;
+      }
+      const url = buildTrailerUrl(v);
+      if (!url) {
+        continue;
+      }
+      const language = String(v.iso_639_1 ?? "").trim() || "und";
+      results.push({ url, language });
+    }
+  }
+
+  return results;
 }
 
 /**

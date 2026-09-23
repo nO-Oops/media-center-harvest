@@ -35,6 +35,8 @@ export const MOVIES_SETTINGS = {
     "imdb_id",
     // Filtre par membre du casting (nom de l'acteur).
     "cast.name",
+    // Filtre par langue des bandes-annonces (ex: trailers.language = "fr").
+    "trailers.language",
   ],
   sortableAttributes: ["year", "rating"],
 };

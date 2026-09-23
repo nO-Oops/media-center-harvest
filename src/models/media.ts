@@ -1,5 +1,5 @@
 import { HarvestSource, MediaKind } from "./harvest";
-import type { CastMember } from "./documents";
+import type { CastMember, Trailer } from "./documents";
 
 /**
  * Un épisode d'une série TV.
@@ -100,6 +100,8 @@ export interface Media {
   runtime?: number;
   /** Liens des vidéos moissonnées. */
   videoLinks: string[];
+  /** Bandes-annonces de type « Trailer » en langue d'origine et en français. */
+  trailers: Trailer[];
   /** Épisodes (uniquement pour les séries). */
   episodes?: Episode[];
   /** Statut de la production (film / série) : en cours, terminé… (série). */
@@ -145,5 +147,6 @@ export function emptyMedia(kind: MediaKind): Media {
     backdropUrls: [],
     spokenLanguages: [],
     videoLinks: [],
+    trailers: [],
   };
 }

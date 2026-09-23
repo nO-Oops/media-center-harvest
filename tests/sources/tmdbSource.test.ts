@@ -187,9 +187,9 @@ describe("TmdbSource", () => {
       // 2 appels pour les détails + 1 appel pour les images.
       expect(spy).toHaveBeenCalledTimes(3);
       expect(spy.mock.calls[0][0]).toBe("/movie/550");
-      expect(spy.mock.calls[0][1]).toEqual({ append_to_response: "credits", language: "fr" });
+      expect(spy.mock.calls[0][1]).toEqual({ append_to_response: "credits,videos", language: "fr" });
       expect(spy.mock.calls[1][0]).toBe("/movie/550");
-      expect(spy.mock.calls[1][1]).toEqual({ append_to_response: "credits", language: "en" });
+      expect(spy.mock.calls[1][1]).toEqual({ append_to_response: "credits,videos", language: "en" });
       expect(spy.mock.calls[2][0]).toBe("/movie/550/images");
       expect(res.original).toEqual({ id: 550, title: "Fight Club" });
       expect(res.french).toEqual({ id: 550, original_language: "en" });
@@ -206,7 +206,7 @@ describe("TmdbSource", () => {
       await source.getShowLocalized(1399);
 
       expect(spy.mock.calls[1][0]).toBe("/tv/1399");
-      expect(spy.mock.calls[1][1]).toEqual({ append_to_response: "credits", language: "en" });
+      expect(spy.mock.calls[1][1]).toEqual({ append_to_response: "credits,videos", language: "en" });
     });
   });
 

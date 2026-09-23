@@ -141,6 +141,87 @@ describe("tmdbMapper", () => {
       expect(media.videoLinks).toEqual([]);
     });
 
+    it("extrait uniquement les trailers de type « Trailer » avec leur langue", () => {
+      const media = mapTmdbMovie({
+        original: {
+          id: 550,
+          title: "Fight Club",
+          videos: {
+            results: [
+              { site: "YouTube", key: "trailer-en-1", iso_639_1: "en", type: "Trailer" },
+              { site: "YouTube", key: "teaser-en", iso_639_1: "en", type: "Teaser" },
+              { site: "YouTube", key: "featurette-en", iso_639_1: "en", type: "Featurette" },
+            ],
+          },
+        },
+        french: {
+          id: 550,
+          title: "Fight Club",
+          videos: {
+            results: [
+              { site: "YouTube", key: "trailer-fr-1", iso_639_1: "fr", type: "Trailer" },
+              { site: "YouTube", key: "teaser-fr", iso_639_1: "fr", type: "Teaser" },
+            ],
+          },
+        },
+      });
+      // Seuls les trailers de type « Trailer » sont conservés, avec leur langue.
+      expect(media.trailers).toEqual([
+        { url: "https://www.youtube.com/watch?v=trailer-en-1", language: "en" },
+        { url: "https://www.youtube.com/watch?v=trailer-fr-1", language: "fr" },
+      ]);
+    });
+
+    it("met d'abord les trailers en langue d'origine puis en français", () => {
+      const media = mapTmdbMovie({
+        original: {
+          id: 1,
+          title: "X",
+          videos: {
+            results: [
+              { site: "YouTube", key: "trailer-en-2", iso_639_1: "en", type: "Trailer" },
+              { site: "YouTube", key: "trailer-en-1", iso_639_1: "en", type: "Trailer" },
+            ],
+          },
+        },
+        french: {
+          id: 1,
+          title: "X",
+          videos: {
+            results: [
+              { site: "YouTube", key: "trailer-fr-1", iso_639_1: "fr", type: "Trailer" },
+            ],
+          },
+        },
+      });
+      expect(media.trailers.map((t) => t.language)).toEqual(["en", "en", "fr"]);
+      expect(media.trailers.map((t) => t.url)).toEqual([
+        "https://www.youtube.com/watch?v=trailer-en-2",
+        "https://www.youtube.com/watch?v=trailer-en-1",
+        "https://www.youtube.com/watch?v=trailer-fr-1",
+      ]);
+    });
+
+    it("construit l'URL des trailers YouTube et valide les flux directs", () => {
+      const media = mapTmdbMovie({
+        original: {
+          id: 2,
+          title: "Y",
+          videos: {
+            results: [
+              { site: "YouTube", key: "yt-key", iso_639_1: "en", type: "Trailer" },
+              { site: "Direct", key: "https://srv-1.example.com/playlist.m3u8", iso_639_1: "en", type: "Trailer" },
+            ],
+          },
+        },
+        french: { id: 2, title: "Y" },
+      });
+      expect(media.trailers).toEqual([
+        { url: "https://www.youtube.com/watch?v=yt-key", language: "en" },
+        { url: "https://srv-1.example.com/playlist.m3u8", language: "en" },
+      ]);
+    });
+
     it("met title/overview en langue originale et title_fr/overview_fr en français", () => {
       const media = mapTmdbMovie({
         original: {
