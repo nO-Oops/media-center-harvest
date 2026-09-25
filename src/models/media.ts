@@ -53,6 +53,8 @@ export interface Person {
   popularity?: number | null;
   /** Département pour lequel la personne est connue (TMDB `known_for_department`). */
   knownForDepartment?: string | null;
+  /** Identifiant TMDB de la personne. */
+  tmdbId?: number | null;
 }
 
 /**
@@ -76,14 +78,16 @@ export interface Media {
   overview_fr?: string;
   /** Année de sortie (extraite de la date) ou undefined. */
   year?: number;
+  /** Date de diffusion complète (ISO 8601 : année-mois-jour), pour les séries. */
+  first_air_date?: string;
   /** Liste des genres. */
   genres: string[];
   /** Distribution enrichie (acteurs + rôle + profil). */
   cast: CastMember[];
   /** Réalisateur (film / documentaire). */
   director?: string;
-  /** Liste des membres de l'équipe technique (nom + poste). */
-  crew: Array<{ name: string; job: string; id: string }>;
+  /** Liste des membres de l'équipe technique (nom + poste + id TMDB). */
+  crew: Array<{ name: string; job: string; id: string; tmdbId?: number | null }>;
   /** Note / moyenne des votes (0 - 10). */
   rating: number;
   /** Liste des URLs de l'affiche / poster. */
@@ -116,6 +120,22 @@ export interface Media {
   createdBy?: string[];
   /** Mots-clés (film). */
   keywords?: string[];
+  /** Date de dernière diffusion (ISO 8601), pour les séries. */
+  lastAirDate?: string;
+  /** Score de popularité TMDB (série). */
+  popularity?: number;
+  /** Site officiel de la série (série). */
+  homepage?: string;
+  /** Tagline / slogan de la série (série). */
+  tagline?: string;
+  /** Type de production (Scripted, Reality, etc.) (série). */
+  type?: string;
+  /** Sociétés de production (série). */
+  productionCompanies?: string[];
+  /** Pays d'origine (codes ISO 3166-1). */
+  originCountries?: string[];
+  /** Durée d'un épisode en minutes (série). */
+  episodeRunTime?: number[];
   /** Source ayant fourni la donnée la plus récente. */
   source?: HarvestSourceLike;
   /**

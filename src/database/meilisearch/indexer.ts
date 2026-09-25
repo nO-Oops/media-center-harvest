@@ -36,6 +36,10 @@ export class MeilisearchIndexer {
    * possèdent trois champs concernés (`id`, `tmdb_id`, `imdb_id`) : l'inférence
    * échoue alors. On crée donc chaque index avec `primaryKey: "id"` avant
    * d'appliquer les paramètres de recherche.
+   *
+   * Si un index existe déjà sans clé primaire (ex: indexes créés par une version
+   * antérieure), on met à jour sa clé primaire via `updateIndex` pour éviter
+   * l'erreur `index_primary_key_multiple_candidates_found`.
    */
   private async createIndexesWithPrimaryKey(): Promise<void> {
     for (const name of Object.values(INDEX_NAMES)) {
@@ -43,11 +47,41 @@ export class MeilisearchIndexer {
         await this.client.createIndex(name, { primaryKey: "id" });
         logger.debug(`Index "${name}" créé avec la clé primaire "id"`);
       } catch (error) {
-        // L'index existe déjà : l'erreur est ignorée (création idempotente).
         const code = (error as { cause?: { code?: string } }).cause?.code;
-        if (code !== "index_already_exists") {
+        if (code === "index_already_exists") {
+          // L'index existe déjà : on s'assure que la clé primaire est bien "id".
+          await this.ensurePrimaryKey(name);
+        } else {
           throw error;
         }
+      }
+    }
+  }
+
+  /**
+   * S'assure que l'index possède la clé primaire `id`.
+   *
+   * Récupère la clé primaire actuelle de l'index et, si elle est absente ou
+   * différente de `id`, la met à jour via `updateIndex`. La tâche est attendue
+   * (via `waitForTask`) car la mise à jour de la clé primaire est asynchrone :
+   * sans attente, l'indexation de documents juste après échouerait encore sur
+   * `index_primary_key_multiple_candidates_found`.
+   */
+  private async ensurePrimaryKey(name: string): Promise<void> {
+    try {
+      const primaryKey = await this.client.index(name).fetchPrimaryKey();
+      if (primaryKey === "id") {
+        logger.debug(`Index "${name}" : clé primaire déjà définie sur "id"`);
+        return;
+      }
+      const task = await this.client.updateIndex(name, { primaryKey: "id" });
+      await this.client.waitForTask(task.taskUid);
+      logger.info(`Index "${name}" : clé primaire mise à jour vers "id"`);
+    } catch (error) {
+      // Si l'index n'existe plus entre-temps, on ignore l'erreur.
+      const code = (error as { cause?: { code?: string } }).cause?.code;
+      if (code !== "index_not_found") {
+        throw error;
       }
     }
   }
@@ -115,6 +149,46 @@ export class MeilisearchIndexer {
     });
     logger.info(`Suppression ${indexName} : ${ids.length} document(s) pour ${filter} (tâche ${task.taskUid})`);
     return ids.length;
+  }
+
+  /**
+   * Récupère les valeurs `tmdb_id` existantes dans un index. Permet la
+   * déduplication par base sans fichier.
+   *
+   * Parcourt les documents de l'index par pages pour construire l'ensemble des
+   * `tmdb_id` déjà indexés. Cette approche évite les limites des filtres
+   * `IN` Meilisearch sur les grandes listes.
+   */
+  async findExistingTmdbIds(
+    indexName: string,
+    _tmdbIds: number[]
+  ): Promise<Set<number>> {
+    const existing = new Set<number>();
+    if (!this.indexes[indexName]) {
+      return existing;
+    }
+    try {
+      const index = this.indexes[indexName];
+      const limit = 1000;
+      let offset = 0;
+      while (true) {
+        const result = await index.search("", { limit, offset });
+        const hits = result.hits ?? [];
+        for (const hit of hits) {
+          const id = (hit as Record<string, unknown>).tmdb_id;
+          if (typeof id === "number") {
+            existing.add(id);
+          }
+        }
+        if (hits.length < limit) {
+          break;
+        }
+        offset += limit;
+      }
+    } catch (error) {
+      logger.debug(`Recherche tmdb_id échouée pour ${indexName} : ${(error as Error).message}`);
+    }
+    return existing;
   }
 
   /**

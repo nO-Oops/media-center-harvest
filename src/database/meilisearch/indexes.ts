@@ -43,8 +43,8 @@ export const MOVIES_SETTINGS = {
 
 /** Paramètres de recherche de l'index `showtv`. */
 export const SHOWTV_SETTINGS = {
-  searchableAttributes: ["title", "overview", "genres"],
-  filterableAttributes: ["type", "genres", "vote_average", "status"],
+  searchableAttributes: ["title", "title_fr", "overview", "overview_fr", "genres"],
+  filterableAttributes: ["type", "genres", "vote_average", "status", "tmdb_id"],
   sortableAttributes: ["air_date", "vote_average"],
 };
 
@@ -58,7 +58,7 @@ export const EPISODES_SETTINGS = {
 /** Paramètres de recherche de l'index `persons`. */
 export const PERSONS_SETTINGS = {
   searchableAttributes: ["name", "biography"],
-  filterableAttributes: ["type", "gender", "known_for_department"],
+  filterableAttributes: ["type", "gender", "known_for_department", "tmdb_id"],
   sortableAttributes: ["popularity", "birthday"],
 };
 

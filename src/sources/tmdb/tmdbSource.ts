@@ -1,5 +1,6 @@
 import { MediaSource, HarvestResult, emptyResult, appendError } from "../MediaSource";
-import { Person } from "../../models/media";
+import { mapTmdbEpisodes } from "./tmdbMapper";
+import { Person, Episode } from "../../models/media";
 import { HarvestSource } from "../../models/harvest";
 import { AppConfig } from "../../utils/config";
 import { retryWithBackoff } from "../../utils/retry";
@@ -231,6 +232,38 @@ export class TmdbSource implements MediaSource {
     return { original, french, backdrops };
   }
 
+  /**
+   * Récupère les épisodes d'une série en appelant `/tv/{id}/season/{n}` pour
+   * chaque saison. Les détails des saisons sont déjà présents dans la réponse
+   * `/tv/{id}`, mais les épisodes ne sont retournés que via l'endpoint
+   * `/tv/{id}/season/{season_number}`.
+   *
+   * Retourne une liste d'épisodes normalisés (`Episode`), regroupés par saison.
+   */
+  async getShowEpisodes(id: number): Promise<Episode[]> {
+    try {
+      const details = await this.request(`/tv/${id}`, {});
+      const seasons = (details.seasons as Array<Record<string, unknown>>) ?? [];
+      const episodes: Episode[] = [];
+      for (const season of seasons) {
+        const seasonNumber = Number(season.season_number);
+        if (!Number.isFinite(seasonNumber) || seasonNumber < 0) {
+          continue;
+        }
+        try {
+          const seasonData = await this.request(`/tv/${id}/season/${seasonNumber}`, {});
+          const seasonEpisodes = (seasonData.episodes as TmdbResponse[]) ?? [];
+          episodes.push(...mapTmdbEpisodes(seasonEpisodes, String(id), seasonNumber));
+        } catch {
+          // Une saison peut échouer sans bloquer l'ensemble du moissonnage.
+        }
+      }
+      return episodes;
+    } catch {
+      return [];
+    }
+  }
+
   /** Récupère une personne par son ID TMDB. */
   async getPerson(id: number): Promise<TmdbResponse> {
     return this.request(`/person/${id}`, {});
@@ -377,13 +410,30 @@ export class TmdbSource implements MediaSource {
         for (const data of await this.searchShows(query, genre, page, number)) {
           const full = await this.getShowLocalized(Number(data.id)).catch(() => data);
           localized.push(full as LocalizedMedia);
-          result.media.push(mapTmdbShow(full as LocalizedMedia));
+          const media = mapTmdbShow(full as LocalizedMedia);
+          // Récupère les épisodes via /tv/{id}/season/{n} et les attache au média.
+          const episodes = await this.getShowEpisodes(Number(data.id));
+          // Les épisodes référencent le média par son identifiant interne (uuid v4)
+          // pour permettre la liaison show→épisodes entre les index.
+          for (const episode of episodes) {
+            episode.showId = media.id;
+          }
+          media.episodes = episodes;
+          result.media.push(media);
         }
       } else {
         for (const data of await this.searchMovies(query, genre, page, number)) {
           const full = await this.getMovieLocalized(Number(data.id)).catch(() => data);
           localized.push(full as LocalizedMedia);
           result.media.push(mapTmdbMovie(full as LocalizedMedia));
+        }
+      }
+
+      // Collecte des épisodes : chaque média de type série expose ses
+      // épisodes via `episodes`. Ils sont indexés dans l'index `episodes`.
+      for (const media of result.media) {
+        if (media.episodes && media.episodes.length > 0) {
+          result.episodes.push(...media.episodes);
         }
       }
 

@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { Media, Person } from "../../models/media";
+import { Media, Person, Episode } from "../../models/media";
 import { MediaKind } from "../../models/harvest";
 import type { CastMember, Trailer } from "../../models/documents";
 import { isValidVideoUrl } from "../../utils/video";
@@ -104,6 +104,7 @@ function extractCast(credits: { cast?: unknown } | undefined): CastMember[] {
       character: c.character ? String(c.character) : null,
       profileUrl: imageUrl(String(c.profile_path ?? "")),
       order: Number(c.order ?? 999),
+      tmdbId: typeof c.id === "number" ? c.id : null,
     }))
     .filter((m) => m.name);
 }
@@ -117,13 +118,14 @@ function extractCast(credits: { cast?: unknown } | undefined): CastMember[] {
  */
 function extractCrew(
   credits: { crew?: unknown } | undefined
-): Array<{ name: string; job: string; id: string }> {
+): Array<{ name: string; job: string; id: string; tmdbId?: number | null }> {
   const crew = (credits?.crew as Array<Record<string, unknown>>) ?? [];
   return crew
     .map((c) => ({
       id: randomUUID(),
       name: String(c.name ?? ""),
       job: String(c.job ?? ""),
+      tmdbId: typeof c.id === "number" ? c.id : null,
     }))
     .filter((c) => c.name);
 }
@@ -132,6 +134,32 @@ function extractCrew(
 function yearFromDate(date: unknown): number | undefined {
   const raw = typeof date === "string" ? date : "";
   return raw ? Number(raw.slice(0, 4)) : undefined;
+}
+
+/**
+ * Convertit une liste de réponses TMDB d'épisodes (issues de
+ * `/tv/{id}/season/{n}`) en objets `Episode` normalisés.
+ *
+ * Chaque épisode reçoit un uuid v4 stable pour l'index `episodes`.
+ */
+export function mapTmdbEpisodes(
+  rawEpisodes: TmdbResponse[],
+  showId: string,
+  seasonNumber: number
+): Episode[] {
+  return rawEpisodes
+    .map((ep, index) => ({
+      id: randomUUID(),
+      showId,
+      episodeNumber: typeof ep.episode_number === "number" ? ep.episode_number : index + 1,
+      seasonNumber,
+      name: String(ep.name ?? ""),
+      overview: String(ep.overview ?? ""),
+      airDate: ep.air_date ? String(ep.air_date) : undefined,
+      runtime: typeof ep.runtime === "number" ? ep.runtime : undefined,
+      thumbnailUrl: ep.still_path ? imageUrl(String(ep.still_path)) : undefined,
+    }))
+    .filter((ep) => ep.name);
 }
 
 /**
@@ -212,6 +240,9 @@ export function mapTmdbMovie(
     runtime: typeof original.runtime === "number" ? original.runtime : undefined,
     trailers: extractTrailers(original, french),
     videoLinks: extractVideoUrls(original),
+    createdBy: ((original.created_by as Array<{ name?: string }>) ?? [])
+      .map((c) => c.name ?? "")
+      .filter(Boolean),
   };
 }
 
@@ -234,14 +265,17 @@ export function mapTmdbShow(data: TmdbResponse | LocalizedMedia): Media {
     personIds.set(member.name.trim().toLowerCase(), member.id);
   }
 
+  const mediaId = randomUUID();
+
   return {
-    id: randomUUID(),
+    id: mediaId,
     kind: MediaKind.SERIES,
     title: String(original.name ?? original.original_name ?? ""),
     title_fr: french.name ? String(french.name) : undefined,
     overview: String(original.overview ?? ""),
     overview_fr: french.overview ? String(french.overview) : undefined,
     year: yearFromDate(original.first_air_date),
+    first_air_date: original.first_air_date ? String(original.first_air_date) : undefined,
     genres: normalizeGenres(original.genres as never),
     cast,
     personIds,
@@ -257,6 +291,24 @@ export function mapTmdbShow(data: TmdbResponse | LocalizedMedia): Media {
     runtime: typeof original.runtime === "number" ? original.runtime : undefined,
     trailers: extractTrailers(original, french),
     videoLinks: extractVideoUrls(original),
+    createdBy: ((original.created_by as Array<{ name?: string }>) ?? [])
+      .map((c) => c.name ?? "")
+      .filter(Boolean),
+    lastAirDate: original.last_air_date ? String(original.last_air_date) : undefined,
+    popularity: typeof original.popularity === "number" ? original.popularity : undefined,
+    homepage: original.homepage ? String(original.homepage) : undefined,
+    tagline: original.tagline ? String(original.tagline) : undefined,
+    type: original.type ? String(original.type) : undefined,
+    productionCompanies: ((original.production_companies as Array<{ name?: string }>) ?? [])
+      .map((c) => c.name ?? "")
+      .filter(Boolean),
+    originCountries: ((original.origin_country as string[]) ?? []).slice(),
+    episodeRunTime: Array.isArray(original.episode_run_time)
+      ? original.episode_run_time.map((t) => Number(t)).filter((n) => Number.isFinite(n))
+      : undefined,
+    status: original.status ? String(original.status) : undefined,
+    numberOfEpisodes: typeof original.number_of_episodes === "number" ? original.number_of_episodes : undefined,
+    numberOfSeasons: typeof original.number_of_seasons === "number" ? original.number_of_seasons : undefined,
   };
 }
 
@@ -305,6 +357,7 @@ export function mapTmdbPerson(data: Record<string, unknown>): Person {
     place_of_birth: placeOfBirth,
     popularity,
     knownForDepartment,
+    tmdbId: typeof data.id === "number" ? data.id : null,
   };
 }
 

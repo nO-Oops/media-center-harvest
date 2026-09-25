@@ -41,15 +41,28 @@ export function mediaToShowTvDocument(media: Media): ShowTvDocument {
     indexName: "showtv",
     type: media.kind,
     title: media.title,
+    title_fr: media.title_fr ?? null,
     overview: media.overview,
+    overview_fr: media.overview_fr ?? null,
     genres: media.genres,
-    air_date: media.year ? String(media.year) : null,
+    air_date: media.first_air_date ?? (media.year ? String(media.year) : null),
     vote_average: media.rating,
     vote_count: 0,
     networks: (media.networks ?? []).join(", "),
     season_number: media.numberOfSeasons ?? 0,
     tmdb_id: media.tmdbId ?? null,
-    imdb_id: media.imdbId ?? null,
+    posterUrls: media.posterUrls ?? [],
+    status: media.status ?? null,
+    number_of_episodes: media.numberOfEpisodes ?? null,
+    last_air_date: media.lastAirDate ?? null,
+    popularity: media.popularity ?? null,
+    homepage: media.homepage ?? null,
+    tagline: media.tagline ?? null,
+    media_type: media.type ?? null,
+    production_companies: media.productionCompanies ?? [],
+    origin_countries: media.originCountries ?? [],
+    episode_run_time: media.episodeRunTime ?? [],
+    created_by: media.createdBy ?? [],
   };
 }
 
@@ -90,7 +103,7 @@ export function personsFromMedia(media: Media): Person[] {
   const persons: Person[] = [];
   const seen = new Set<string>();
 
-  const add = (name: string, type: Person["type"], id?: string): void => {
+  const add = (name: string, type: Person["type"], id?: string, tmdbId?: number | null): void => {
     const clean = name.trim();
     if (!clean || seen.has(clean)) {
       return;
@@ -107,13 +120,14 @@ export function personsFromMedia(media: Media): Person[] {
       biography: "",
       profileUrl: "",
       knownForMediaIds: [mediaId],
+      tmdbId,
     });
   };
 
   // Acteurs (cast) : réutilisation des uuid v4 partagés via `media.personIds`.
   for (const member of media.cast) {
     const key = member.name.trim().toLowerCase();
-    add(member.name, "actor", media.personIds?.get(key));
+    add(member.name, "actor", media.personIds?.get(key), member.tmdbId ?? null);
   }
   // Réalisateur (film / documentaire / série).
   if (media.director) {
@@ -122,12 +136,12 @@ export function personsFromMedia(media: Media): Person[] {
   // Équipe technique : chaque membre est indexé comme une personne à part
   // entière, avec un type déduit de son poste (scénariste, producteur…).
   // Le réalisateur est exclu ici car déjà traité ci-dessus.
-  for (const { name, job, id } of media.crew) {
+  for (const { name, job, id, tmdbId } of media.crew) {
     const clean = name.trim();
     if (!clean || clean.toLowerCase() === media.director?.trim().toLowerCase()) {
       continue;
     }
-    add(clean, crewJobToType(job), id);
+    add(clean, crewJobToType(job), id, tmdbId ?? null);
   }
 
   return persons;
@@ -174,5 +188,6 @@ export function personToDocument(person: Person): PersonDocument {
     place_of_birth: person.place_of_birth ?? null,
     popularity: person.popularity ?? null,
     knownForDepartment: person.knownForDepartment ?? null,
+    tmdb_id: person.tmdbId ?? null,
   };
 }

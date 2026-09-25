@@ -22,6 +22,8 @@ export interface CastMember {
   profileUrl: string;
   /** Rang dans le casting (0 = premier plan). */
   order: number;
+  /** Identifiant TMDB de la personne (pour la déduplication). */
+  tmdbId?: number | null;
 }
 
 /**
@@ -133,6 +135,8 @@ export interface PersonDocument {
   popularity?: number | null;
   /** Département pour lequel la personne est connue (TMDB `known_for_department`). */
   knownForDepartment?: string | null;
+  /** Identifiant TMDB de la personne. */
+  tmdb_id?: number | null;
 }
 
 /**
@@ -147,8 +151,12 @@ export interface ShowTvDocument {
   type: MediaKind;
   /** Titre de la série. */
   title: string;
+  /** Titre de la série en français. */
+  title_fr?: string | null;
   /** Synopsis. */
   overview: string;
+  /** Synopsis en français. */
+  overview_fr?: string | null;
   /** Liste des genres. */
   genres: string[];
   /** Date de diffusion (ISO 8601). */
@@ -163,8 +171,30 @@ export interface ShowTvDocument {
   season_number: number;
   /** Identifiant TMDB. */
   tmdb_id: number | null;
-  /** Identifiant IMDB. */
-  imdb_id: string | null;
+  /** URL de l'affiche / poster principal. */
+  posterUrls: string[];
+  /** Statut de la production (Ended, In Production…). */
+  status?: string | null;
+  /** Nombre total d'épisodes. */
+  number_of_episodes?: number | null;
+  /** Date de dernière diffusion (ISO 8601). */
+  last_air_date?: string | null;
+  /** Score de popularité TMDB. */
+  popularity?: number | null;
+  /** Site officiel de la série. */
+  homepage?: string | null;
+  /** Tagline / slogan de la série. */
+  tagline?: string | null;
+  /** Type de production (Scripted, Reality…). */
+  media_type?: string | null;
+  /** Sociétés de production. */
+  production_companies?: string[];
+  /** Pays d'origine (codes ISO 3166-1). */
+  origin_countries?: string[];
+  /** Durée d'un épisode en minutes. */
+  episode_run_time?: number[];
+  /** Créateurs de la série. */
+  created_by?: string[];
 }
 
 /**

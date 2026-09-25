@@ -15,6 +15,8 @@ import { logger } from "../utils/logger";
 export interface IndexerContract {
   /** Indexe un lot de documents et rend compte du résultat (upsert). */
   upsert(documents: MeilisearchDocument[]): Promise<{ added: number; errors: string[] }>;
+  /** Récupère les tmdb_id existants dans un index pour une liste donnée. */
+  findExistingTmdbIds(indexName: string, tmdbIds: number[]): Promise<Set<number>>;
 }
 
 /** Résultat de l'indexation d'un agrégat de récoltes. */
@@ -40,25 +42,50 @@ export async function indexResults(
   result: HarvestResult,
   indexer: IndexerContract
 ): Promise<IndexResult> {
+  // Déduplication par base : on interroge Meilisearch pour connaître les
+  // tmdb_id déjà indexés dans chaque index et on exclut les documents en double.
+  const existingTmdbIds = await deduplicateByDatabase(result, indexer);
+
   const documents: MeilisearchDocument[] = [];
+  // Identifiants internes des médias nouvellement indexés (pour lier les épisodes).
+  const newMediaIds = new Set<string>();
 
   for (const media of result.media) {
     if (media.kind === "series") {
-      documents.push(mediaToShowTvDocument(media));
+      if (!existingTmdbIds.showtv.has(media.tmdbId ?? -1)) {
+        documents.push(mediaToShowTvDocument(media));
+        newMediaIds.add(media.id);
+      }
     } else {
       // movie / documentary -> index movies (H4 : type filterable)
-      documents.push(mediaToMovieDocument(media));
+      if (!existingTmdbIds.movies.has(media.tmdbId ?? -1)) {
+        documents.push(mediaToMovieDocument(media));
+      }
     }
   }
+  // Les épisodes ne sont indexés que pour les médias nouvellement créés, afin
+  // d'éviter les doublons跨 runs (les IDs internes changeant à chaque exécution).
   for (const episode of result.episodes) {
-    documents.push(episodeToDocument(episode));
+    if (newMediaIds.has(episode.showId)) {
+      documents.push(episodeToDocument(episode));
+    }
   }
 
   // Pour chaque média (movies/showtv), dériver les personnes liées (acteurs,
   // réalisateur, équipe) et les agréger avec celles issues de la source en un
   // seul document par nom+rôle, avec les médias connus accumulés.
   const derived = result.media.flatMap((media) => personsFromMedia(media));
-  documents.push(...mergePersons(derived, result.persons).map(personToDocument));
+  const mergedPersons = mergePersons(derived, result.persons);
+  // Déduplication par tmdb_id à la fois contre la base existante et contre les
+  // documents déjà ajoutés dans cette exécution (évite les doublons internes).
+  const indexedTmdbIds = new Set(existingTmdbIds.persons);
+  for (const person of mergedPersons) {
+    const key = person.tmdbId ?? -1;
+    if (!indexedTmdbIds.has(key)) {
+      indexedTmdbIds.add(key);
+      documents.push(personToDocument(person));
+    }
+  }
 
   const { added, errors } = await indexer.upsert(documents);
   logger.info(`Indexation : ${added} document(s) indexés, ${errors.length} erreur(s)`);
@@ -68,6 +95,33 @@ export async function indexResults(
     errors,
     submitted: added,
   };
+}
+
+/**
+ * Interroge Meilisearch pour récupérer les tmdb_id déjà indexés dans chaque
+ * index et retourne un ensemble par index. Permet la déduplication sans fichier.
+ */
+async function deduplicateByDatabase(
+  result: HarvestResult,
+  indexer: IndexerContract
+): Promise<{ movies: Set<number>; showtv: Set<number>; persons: Set<number> }> {
+  const movieIds = result.media
+    .filter((m) => m.kind !== "series" && m.tmdbId != null)
+    .map((m) => m.tmdbId as number);
+  const showIds = result.media
+    .filter((m) => m.kind === "series" && m.tmdbId != null)
+    .map((m) => m.tmdbId as number);
+  const personIds = result.persons
+    .filter((p) => p.tmdbId != null)
+    .map((p) => p.tmdbId as number);
+
+  const [movies, showtv, persons] = await Promise.all([
+    indexer.findExistingTmdbIds("movies", movieIds),
+    indexer.findExistingTmdbIds("showtv", showIds),
+    indexer.findExistingTmdbIds("persons", personIds),
+  ]);
+
+  return { movies, showtv, persons };
 }
 
 /**
@@ -114,6 +168,9 @@ function mergePersons(derived: Person[], source: Person[]): Person[] {
     }
     if (!target.knownForDepartment && source2.knownForDepartment) {
       target.knownForDepartment = source2.knownForDepartment;
+    }
+    if (target.tmdbId == null && source2.tmdbId != null) {
+      target.tmdbId = source2.tmdbId;
     }
   };
 
